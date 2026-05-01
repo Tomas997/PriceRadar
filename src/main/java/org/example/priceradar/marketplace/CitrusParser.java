@@ -1,4 +1,4 @@
-package org.example.priceradar.Marketplaces;
+package org.example.priceradar.marketplace;
 
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -7,6 +7,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.example.priceradar.model.ProductCandidate;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -16,7 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Citrus implements MarketplaceSearchParser {
+@Component
+public class CitrusParser implements MarketplaceSearchParser {
 
     private static final CloseableHttpClient client = HttpClients.createDefault();
 
@@ -25,7 +27,7 @@ public class Citrus implements MarketplaceSearchParser {
         return "Citrus";
     }
 
-
+    @Override
     public List<ProductCandidate> parseProducts(String json) {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(json);
@@ -72,8 +74,8 @@ public class Citrus implements MarketplaceSearchParser {
     }
 
     public static void main(String[] args) throws Exception {
-        Citrus citrus = new Citrus();
-        List<ProductCandidate> products = citrus.searchProducts("Apple iPhone 17e 256GB Black");
+        CitrusParser citrusParser = new CitrusParser();
+        List<ProductCandidate> products = citrusParser.searchProducts("Apple iPhone 17e 256GB Black");
         products.forEach(p ->
                 System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
         );

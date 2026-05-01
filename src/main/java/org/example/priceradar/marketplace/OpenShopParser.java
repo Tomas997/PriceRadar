@@ -1,4 +1,4 @@
-package org.example.priceradar.Marketplaces;
+package org.example.priceradar.marketplace;
 
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -7,6 +7,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.example.priceradar.model.ProductCandidate;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -16,7 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-public class OpenShop implements MarketplaceSearchParser {
+@Component
+public class OpenShopParser implements MarketplaceSearchParser {
 
     private static final CloseableHttpClient client = HttpClients.createDefault();
 
@@ -32,6 +34,7 @@ public class OpenShop implements MarketplaceSearchParser {
                 .trim();
     }
 
+    @Override
     public List<ProductCandidate> parseProducts(String json) {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(json);
@@ -77,9 +80,9 @@ public class OpenShop implements MarketplaceSearchParser {
     }
 
     public static void main(String[] args) {
-        OpenShop openShop = new OpenShop();
+        OpenShopParser openShopParser = new OpenShopParser();
 
-        List<ProductCandidate> products = openShop.searchProducts("Victus");
+        List<ProductCandidate> products = openShopParser.searchProducts("Victus");
 
         products.forEach(p ->
                 System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())

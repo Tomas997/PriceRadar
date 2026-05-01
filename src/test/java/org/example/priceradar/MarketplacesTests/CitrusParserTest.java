@@ -1,6 +1,6 @@
 package org.example.priceradar.MarketplacesTests;
 
-import org.example.priceradar.Marketplaces.Citrus;
+import org.example.priceradar.marketplace.CitrusParser;
 import org.example.priceradar.model.ProductCandidate;
 import org.junit.jupiter.api.Test;
 
@@ -8,9 +8,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class CitrusTest {
+class CitrusParserTest {
 
-    private final Citrus citrus = new Citrus();
+    private final CitrusParser citrusParser = new CitrusParser();
 
     private static final String MOCK_JSON = """
             {
@@ -44,21 +44,21 @@ class CitrusTest {
 
     @Test
     void parseProducts_shouldReturnOneProduct() {
-        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+        List<ProductCandidate> products = citrusParser.parseProducts(MOCK_JSON);
 
         assertEquals(1, products.size());
     }
 
     @Test
     void parseProducts_shouldHaveCorrectMarketplaceName() {
-        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+        List<ProductCandidate> products = citrusParser.parseProducts(MOCK_JSON);
 
         assertEquals("Citrus", products.get(0).marketplace());
     }
 
     @Test
     void parseProducts_shouldDecodeUnicodeName() {
-        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+        List<ProductCandidate> products = citrusParser.parseProducts(MOCK_JSON);
 
         assertEquals(
                 "Смартфон Apple iPhone 17e 256GB Black",
@@ -68,14 +68,14 @@ class CitrusTest {
 
     @Test
     void parseProducts_shouldHaveCorrectPrice() {
-        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+        List<ProductCandidate> products = citrusParser.parseProducts(MOCK_JSON);
 
         assertEquals(34999L, products.get(0).price());
     }
 
     @Test
     void parseProducts_shouldHaveCorrectUrl() {
-        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+        List<ProductCandidate> products = citrusParser.parseProducts(MOCK_JSON);
 
         assertEquals(
                 "https://www.ctrs.com.ua/smartfony/smartfon-apple-iphone-17e-256gb-black-789804.html",
@@ -85,7 +85,7 @@ class CitrusTest {
 
     @Test
     void parseProducts_shouldHaveCorrectPresence() {
-        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+        List<ProductCandidate> products = citrusParser.parseProducts(MOCK_JSON);
 
         assertTrue(products.get(0).inStock());
     }
@@ -100,7 +100,7 @@ class CitrusTest {
                 }
                 """;
 
-        List<ProductCandidate> products = citrus.parseProducts(emptyJson);
+        List<ProductCandidate> products = citrusParser.parseProducts(emptyJson);
 
         assertTrue(products.isEmpty());
     }

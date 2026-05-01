@@ -1,4 +1,4 @@
-package org.example.priceradar.Marketplaces;
+package org.example.priceradar.marketplace;
 
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.cookie.BasicCookieStore;
@@ -8,6 +8,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.example.priceradar.model.ProductCandidate;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -17,7 +18,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-public class StoreInUA implements MarketplaceSearchParser {
+
+@Component
+public class StoreInUaParser implements MarketplaceSearchParser {
 
     private static final BasicCookieStore cookieStore = new BasicCookieStore();
 
@@ -30,6 +33,7 @@ public class StoreInUA implements MarketplaceSearchParser {
         return "StoreInUA";
     }
 
+    @Override
     public List<ProductCandidate> parseProducts(String json) {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(json);
@@ -75,9 +79,9 @@ public class StoreInUA implements MarketplaceSearchParser {
     }
 
     public static void main(String[] args) {
-        StoreInUA storeInUA = new StoreInUA();
+        StoreInUaParser storeInUaParser = new StoreInUaParser();
 
-        List<ProductCandidate> products = storeInUA.searchProducts("Optonica");
+        List<ProductCandidate> products = storeInUaParser.searchProducts("Optonica");
 
         products.forEach(p ->
                 System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
