@@ -1,13 +1,16 @@
 package org.example.priceradar.MarketplacesTests;
 
 import org.example.priceradar.Marketplaces.OpenShop;
+import org.example.priceradar.model.ProductCandidate;
 import org.junit.jupiter.api.Test;
+
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class OpenShopTest {
+
+    private final OpenShop openShop = new OpenShop();
 
     private static final String MOCK_JSON = """
             [
@@ -29,53 +32,74 @@ class OpenShopTest {
             """;
 
     @Test
-    void parseProducts_shouldReturnTwoProducts() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
+    void parseProducts_shouldReturnTwoProducts() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
         assertEquals(2, products.size());
     }
 
     @Test
-    void parseProducts_firstProduct_shouldDecodeUnicodeName() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
-        assertEquals("Смартфон Apple iPhone 17e 256GB Black (MHRV4)", products.get(0).get("name"));
+    void parseProducts_firstProduct_shouldHaveCorrectMarketplace() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
+        assertEquals("OpenShop", products.get(0).marketplace());
     }
 
     @Test
-    void parseProducts_firstProduct_shouldCleanPriceFromHtml() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
-        assertEquals("33624.00", products.get(0).get("price"));
-    }
+    void parseProducts_firstProduct_shouldDecodeUnicodeName() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
 
-    @Test
-    void parseProducts_firstProduct_shouldHaveCorrectId() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
-        assertEquals("773146", products.get(0).get("id"));
-    }
-
-    @Test
-    void parseProducts_firstProduct_shouldHaveCorrectUrl() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
         assertEquals(
-                "https://openshop.ua/smartfon-apple-iphone-17e-256gb-black-mhrv4/",
-                products.get(0).get("url")
+                "Смартфон Apple iPhone 17e 256GB Black (MHRV4)",
+                products.get(0).title()
         );
     }
 
     @Test
-    void parseProducts_secondProduct_shouldHaveCorrectPrice() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
-        assertEquals("31821.00", products.get(1).get("price"));
+    void parseProducts_firstProduct_shouldCleanPriceFromHtml() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
+        assertEquals(33624L, products.get(0).price());
     }
 
     @Test
-    void parseProducts_secondProduct_shouldDecodeUnicodeName() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts(MOCK_JSON);
-        assertEquals("Смартфон Apple iPhone 17e 256GB eSIM Black (NHRN4)", products.get(1).get("name"));
+    void parseProducts_firstProduct_shouldHaveCorrectUrl() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
+        assertEquals(
+                "https://openshop.ua/smartfon-apple-iphone-17e-256gb-black-mhrv4/",
+                products.get(0).url()
+        );
     }
 
     @Test
-    void parseProducts_emptyArray_shouldReturnEmptyList() throws Exception {
-        List<Map<String, String>> products = OpenShop.parseProducts("[]");
+    void parseProducts_firstProduct_shouldBeAvailable() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
+        assertTrue(products.get(0).inStock());
+    }
+
+    @Test
+    void parseProducts_secondProduct_shouldHaveCorrectPrice() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
+        assertEquals(31821L, products.get(1).price());
+    }
+
+    @Test
+    void parseProducts_secondProduct_shouldDecodeUnicodeName() {
+        List<ProductCandidate> products = openShop.parseProducts(MOCK_JSON);
+
+        assertEquals(
+                "Смартфон Apple iPhone 17e 256GB eSIM Black (NHRN4)",
+                products.get(1).title()
+        );
+    }
+
+    @Test
+    void parseProducts_emptyArray_shouldReturnEmptyList() {
+        List<ProductCandidate> products = openShop.parseProducts("[]");
+
         assertTrue(products.isEmpty());
     }
 }

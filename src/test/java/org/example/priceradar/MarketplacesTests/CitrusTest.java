@@ -1,13 +1,16 @@
 package org.example.priceradar.MarketplacesTests;
 
 import org.example.priceradar.Marketplaces.Citrus;
+import org.example.priceradar.model.ProductCandidate;
 import org.junit.jupiter.api.Test;
+
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CitrusTest {
+
+    private final Citrus citrus = new Citrus();
 
     private static final String MOCK_JSON = """
             {
@@ -40,40 +43,55 @@ class CitrusTest {
             """;
 
     @Test
-    void parseProducts_shouldReturnOneProduct() throws Exception {
-        List<Map<String, String>> products = Citrus.parseProducts(MOCK_JSON);
+    void parseProducts_shouldReturnOneProduct() {
+        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+
         assertEquals(1, products.size());
     }
 
     @Test
-    void parseProducts_shouldHaveCorrectId() throws Exception {
-        List<Map<String, String>> products = Citrus.parseProducts(MOCK_JSON);
-        assertEquals("789804", products.get(0).get("id"));
+    void parseProducts_shouldHaveCorrectMarketplaceName() {
+        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+
+        assertEquals("Citrus", products.get(0).marketplace());
     }
 
     @Test
-    void parseProducts_shouldDecodeUnicodeName() throws Exception {
-        List<Map<String, String>> products = Citrus.parseProducts(MOCK_JSON);
-        assertEquals("Смартфон Apple iPhone 17e 256GB Black", products.get(0).get("name"));
-    }
+    void parseProducts_shouldDecodeUnicodeName() {
+        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
 
-    @Test
-    void parseProducts_shouldHaveCorrectPrice() throws Exception {
-        List<Map<String, String>> products = Citrus.parseProducts(MOCK_JSON);
-        assertEquals("34999", products.get(0).get("price"));
-    }
-
-    @Test
-    void parseProducts_shouldHaveCorrectUrl() throws Exception {
-        List<Map<String, String>> products = Citrus.parseProducts(MOCK_JSON);
         assertEquals(
-                "https://www.ctrs.com.ua/smartfony/smartfon-apple-iphone-17e-256gb-black-789804.html",
-                products.get(0).get("url")
+                "Смартфон Apple iPhone 17e 256GB Black",
+                products.get(0).title()
         );
     }
 
     @Test
-    void parseProducts_emptyItems_shouldReturnEmptyList() throws Exception {
+    void parseProducts_shouldHaveCorrectPrice() {
+        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+
+        assertEquals(34999L, products.get(0).price());
+    }
+
+    @Test
+    void parseProducts_shouldHaveCorrectUrl() {
+        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+
+        assertEquals(
+                "https://www.ctrs.com.ua/smartfony/smartfon-apple-iphone-17e-256gb-black-789804.html",
+                products.get(0).url()
+        );
+    }
+
+    @Test
+    void parseProducts_shouldHaveCorrectPresence() {
+        List<ProductCandidate> products = citrus.parseProducts(MOCK_JSON);
+
+        assertTrue(products.get(0).inStock());
+    }
+
+    @Test
+    void parseProducts_emptyItems_shouldReturnEmptyList() {
         String emptyJson = """
                 {
                     "results": {
@@ -81,7 +99,9 @@ class CitrusTest {
                     }
                 }
                 """;
-        List<Map<String, String>> products = Citrus.parseProducts(emptyJson);
+
+        List<ProductCandidate> products = citrus.parseProducts(emptyJson);
+
         assertTrue(products.isEmpty());
     }
 }
