@@ -1,5 +1,6 @@
-package org.example.priceradar.MarketplacesTests;
+package org.example.priceradar.MarketplacesTests.Unit;
 
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.example.priceradar.marketplace.OpenShopParser;
 import org.example.priceradar.model.ProductCandidate;
 import org.junit.jupiter.api.Test;
@@ -10,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class OpenShopParserTest {
 
-    private final OpenShopParser openShopParser = new OpenShopParser();
+    private final OpenShopParser openShopParser = new OpenShopParser(HttpClients.createDefault());
 
     private static final String MOCK_JSON = """
             [

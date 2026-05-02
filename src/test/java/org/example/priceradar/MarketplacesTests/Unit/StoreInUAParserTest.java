@@ -1,6 +1,7 @@
-package org.example.priceradar.MarketplacesTests;
+package org.example.priceradar.MarketplacesTests.Unit;
 
-import org.example.priceradar.marketplace.StoreInUaParser;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.example.priceradar.marketplace.StoreInUAParser;
 import org.example.priceradar.model.ProductCandidate;
 import org.junit.jupiter.api.Test;
 
@@ -8,9 +9,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class StoreInUaParserTest {
+class StoreInUAParserTest {
 
-    private final StoreInUaParser storeInUaParser = new StoreInUaParser();
+    private final StoreInUAParser storeInUaParser = new StoreInUAParser(HttpClients.createDefault());
 
     private static final String MOCK_JSON = """
             {

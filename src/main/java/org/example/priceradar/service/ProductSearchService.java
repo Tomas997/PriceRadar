@@ -16,7 +16,7 @@ public class ProductSearchService {
     }
 
     public List<MarketplaceSearchResult> search(String query) {
-        return parsers.stream()
+        return parsers.parallelStream()
                 .map(parser -> {
                     try {
                         return new MarketplaceSearchResult(

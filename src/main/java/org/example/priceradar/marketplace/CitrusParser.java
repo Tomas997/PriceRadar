@@ -7,6 +7,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.example.priceradar.model.ProductCandidate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -19,8 +20,13 @@ import java.util.List;
 
 @Component
 public class CitrusParser implements MarketplaceSearchParser {
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    private static final CloseableHttpClient client = HttpClients.createDefault();
+    private final CloseableHttpClient client;
+
+    public CitrusParser(CloseableHttpClient client) {
+        this.client = client;
+    }
 
     @Override
     public String marketplaceName() {
@@ -29,7 +35,6 @@ public class CitrusParser implements MarketplaceSearchParser {
 
     @Override
     public List<ProductCandidate> parseProducts(String json) {
-        ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(json);
         JsonNode items = root.path("results").path("items");
 
@@ -73,11 +78,11 @@ public class CitrusParser implements MarketplaceSearchParser {
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        CitrusParser citrusParser = new CitrusParser();
-        List<ProductCandidate> products = citrusParser.searchProducts("Apple iPhone 17e 256GB Black");
-        products.forEach(p ->
-                System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
-        );
-    }
+//    public static void main(String[] args) throws Exception {
+//        CitrusParser citrusParser = new CitrusParser(HttpClients.createDefault());
+//        List<ProductCandidate> products = citrusParser.searchProducts("Apple iPhone 17e 256GB Black");
+//        products.forEach(p ->
+//                System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
+//        );
+//    }
 }

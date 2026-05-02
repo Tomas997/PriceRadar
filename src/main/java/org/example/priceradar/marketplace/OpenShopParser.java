@@ -19,8 +19,13 @@ import java.util.List;
 
 @Component
 public class OpenShopParser implements MarketplaceSearchParser {
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    private static final CloseableHttpClient client = HttpClients.createDefault();
+    private final CloseableHttpClient client;
+
+    public OpenShopParser(CloseableHttpClient client) {
+        this.client = client;
+    }
 
     @Override
     public String marketplaceName() {
@@ -36,7 +41,6 @@ public class OpenShopParser implements MarketplaceSearchParser {
 
     @Override
     public List<ProductCandidate> parseProducts(String json) {
-        ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(json);
 
         List<ProductCandidate> products = new ArrayList<>();
@@ -79,13 +83,13 @@ public class OpenShopParser implements MarketplaceSearchParser {
         }
     }
 
-    public static void main(String[] args) {
-        OpenShopParser openShopParser = new OpenShopParser();
-
-        List<ProductCandidate> products = openShopParser.searchProducts("Victus");
-
-        products.forEach(p ->
-                System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
-        );
-    }
+//    public static void main(String[] args) {
+//        OpenShopParser openShopParser = new OpenShopParser(HttpClients.createDefault());
+//
+//        List<ProductCandidate> products = openShopParser.searchProducts("Victus");
+//
+//        products.forEach(p ->
+//                System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
+//        );
+//    }
 }

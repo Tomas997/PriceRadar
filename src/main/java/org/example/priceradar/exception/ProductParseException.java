@@ -1,4 +1,4 @@
-package org.example.priceradar.exeption;
+package org.example.priceradar.exception;
 
 public class ProductParseException extends RuntimeException {
     public ProductParseException(String message, Throwable cause) {

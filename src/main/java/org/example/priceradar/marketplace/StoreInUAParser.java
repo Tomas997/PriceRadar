@@ -20,13 +20,14 @@ import java.util.List;
 
 
 @Component
-public class StoreInUaParser implements MarketplaceSearchParser {
+public class StoreInUAParser implements MarketplaceSearchParser {
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    private static final BasicCookieStore cookieStore = new BasicCookieStore();
+    private final CloseableHttpClient client;
 
-    private static final CloseableHttpClient client = HttpClients.custom()
-            .setDefaultCookieStore(cookieStore)
-            .build();
+    public StoreInUAParser(CloseableHttpClient client) {
+        this.client = client;
+    }
 
     @Override
     public String marketplaceName() {
@@ -35,7 +36,6 @@ public class StoreInUaParser implements MarketplaceSearchParser {
 
     @Override
     public List<ProductCandidate> parseProducts(String json) {
-        ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(json);
         JsonNode data = root.path("data");
 
@@ -78,13 +78,13 @@ public class StoreInUaParser implements MarketplaceSearchParser {
         }
     }
 
-    public static void main(String[] args) {
-        StoreInUaParser storeInUaParser = new StoreInUaParser();
-
-        List<ProductCandidate> products = storeInUaParser.searchProducts("Optonica");
-
-        products.forEach(p ->
-                System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
-        );
-    }
+//    public static void main(String[] args) {
+//        StoreInUAParser storeInUaParser = new StoreInUAParser(HttpClients.createDefault());
+//
+//        List<ProductCandidate> products = storeInUaParser.searchProducts("Optonica");
+//
+//        products.forEach(p ->
+//                System.out.println(p.title() + " | " + p.price() + " грн | " + p.url())
+//        );
+//    }
 }
