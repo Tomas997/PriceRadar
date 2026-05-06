@@ -1,44 +1,53 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.6'
-    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.springframework.boot' version '4.0.6' apply false
+    id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
-group = 'org.example'
-version = '0.0.1-SNAPSHOT'
-description = 'PriceRadar'
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+    group = 'org.example'
+    version = '0.0.1-SNAPSHOT'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    tasks.named('test') {
+        useJUnitPlatform()
     }
 }
 
-repositories {
-    mavenCentral()
-}
+// Запускає всі три сервіси паралельно у фоні (Windows: start, Linux/Mac: & )
+tasks.register('bootRunAll') {
+    group = 'application'
+    description = 'Start parser-service, product-service and api-gateway in parallel'
+    dependsOn ':parser-service:bootJar', ':product-service:bootJar', ':api-gateway:bootJar'
 
-dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testAnnotationProcessor 'org.projectlombok:lombok'
-
-    implementation("com.microsoft.playwright:playwright:1.58.0")
-
-// Source: https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5
-    implementation("org.apache.httpcomponents.client5:httpclient5:5.5.1")
-
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    runtimeOnly("org.postgresql:postgresql")
-
-    runtimeOnly("com.h2database:h2:2.4.240")
-
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
+    doLast {
+        def services = [
+            [jar: 'parser-service/build/libs',  port: '8082'],
+            [jar: 'product-service/build/libs', port: '8081'],
+            [jar: 'api-gateway/build/libs',     port: '8080'],
+        ]
+        services.each { svc ->
+            def jarFile = fileTree(svc.jar).filter { it.name.endsWith('.jar') }.singleFile
+            def cmd = ['java', '-jar', jarFile.absolutePath]
+            new ProcessBuilder(cmd)
+                .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start()
+            println "Started ${jarFile.name} on :${svc.port}"
+        }
+        println "\nAll services started. Press Ctrl+C to stop."
+        Thread.currentThread().join() // тримаємо процес живим
+    }
 }

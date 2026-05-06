@@ -1,1 +1,6 @@
 rootProject.name = 'PriceRadar'
+
+include 'parser-service'
+include 'product-service'
+include 'api-gateway'
+//include 'user-service'
