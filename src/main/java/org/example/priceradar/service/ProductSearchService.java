@@ -57,4 +57,12 @@ public class ProductSearchService {
 
         return product;
     }
+
+    public List<Product> getAllTrackedProducts() {
+        return productRepository.findAll();
+    }
+
+    public List<PriceEntry> getPriceHistory(Long productId) {
+        return priceEntryRepository.findByProductIdOrderByParsedAtDesc(productId);
+    }
 }
