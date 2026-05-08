@@ -40,6 +40,21 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  user-service:
+    build: ./user-service
+    container_name: priceradar-user
+    ports:
+      - "8083:8083"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/priceradar
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-priceradar-secret-key-must-be-at-least-32-characters-long}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
   api-gateway:
     build: ./api-gateway
     container_name: priceradar-gateway
@@ -48,9 +63,11 @@ services:
     environment:
       PARSER_SERVICE_URL: http://parser-service:8082
       PRODUCT_SERVICE_URL: http://product-service:8081
+      USER_SERVICE_URL: http://user-service:8083
     depends_on:
       - parser-service
       - product-service
+      - user-service
     restart: on-failure
 
 volumes:

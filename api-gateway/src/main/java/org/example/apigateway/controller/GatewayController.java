@@ -25,10 +25,22 @@ public class GatewayController {
     @Value("${gateway.product-url}")
     private String productUrl;
 
+    @Value("${gateway.user-url}")
+    private String userUrl;
+
     private final RestClient restClient;
 
     public GatewayController(RestClient restClient) {
         this.restClient = restClient;
+    }
+
+    // User-service — реєстрація, логін, профіль
+    @RequestMapping("/api/auth/**")
+    public ResponseEntity<byte[]> proxyAuth(
+            HttpMethod method,
+            HttpServletRequest request,
+            @RequestBody(required = false) byte[] body) {
+        return proxy(userUrl, request, method, body);
     }
 
     // Marketplace search — parser-service
