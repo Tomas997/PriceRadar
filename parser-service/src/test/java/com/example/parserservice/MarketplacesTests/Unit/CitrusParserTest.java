@@ -3,8 +3,8 @@ package com.example.parserservice.MarketplacesTests.Unit;
 import com.example.parserservice.marketplace.CitrusParser;
 import com.example.parserservice.model.ProductCandidate;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CitrusParserTest {
 
-    private final CitrusParser citrusParser = new CitrusParser(HttpClients.createDefault());
+    private final CitrusParser citrusParser = new CitrusParser(new ObjectMapper(), HttpClients.createDefault());
 
     private static final String MOCK_JSON = """
             {

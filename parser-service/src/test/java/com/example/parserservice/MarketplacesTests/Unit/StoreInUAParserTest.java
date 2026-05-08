@@ -1,18 +1,20 @@
 package com.example.parserservice.MarketplacesTests.Unit;
 
+import com.example.parserservice.marketplace.StoreInUAParser;
+import com.example.parserservice.model.ProductCandidate;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.example.priceradar.marketplace.StoreInUAParser;
-import org.example.priceradar.model.ProductCandidate;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StoreInUAParserTest {
 
-    private final StoreInUAParser storeInUaParser = new StoreInUAParser(HttpClients.createDefault());
+    private final StoreInUAParser storeInUaParser = new StoreInUAParser(new ObjectMapper(), HttpClients.createDefault());
 
     private static final String MOCK_JSON = """
             {

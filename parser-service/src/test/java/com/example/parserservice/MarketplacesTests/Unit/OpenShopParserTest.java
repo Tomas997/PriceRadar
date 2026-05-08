@@ -1,8 +1,9 @@
 package com.example.parserservice.MarketplacesTests.Unit;
 
+import com.example.parserservice.marketplace.OpenShopParser;
+import com.example.parserservice.model.ProductCandidate;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.example.priceradar.marketplace.OpenShopParser;
-import org.example.priceradar.model.ProductCandidate;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenShopParserTest {
 
-    private final OpenShopParser openShopParser = new OpenShopParser(HttpClients.createDefault());
+    private final OpenShopParser openShopParser = new OpenShopParser(new ObjectMapper(), HttpClients.createDefault());
 
     private static final String MOCK_JSON = """
             [
