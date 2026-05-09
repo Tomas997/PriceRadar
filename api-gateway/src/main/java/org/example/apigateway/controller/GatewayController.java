@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 @RestController
 public class GatewayController {
@@ -63,6 +64,15 @@ public class GatewayController {
         return proxy(parserUrl, request, method, body);
     }
 
+    // Product-service — tracked groups
+    @RequestMapping("/api/groups/**")
+    public ResponseEntity<byte[]> proxyGroups(
+            HttpMethod method,
+            HttpServletRequest request,
+            @RequestBody(required = false) byte[] body) {
+        return proxy(productUrl, request, method, body);
+    }
+
     // Product-service — tracked products CRUD
     @RequestMapping("/api/products/**")
     public ResponseEntity<byte[]> proxyProducts(
@@ -85,8 +95,9 @@ public class GatewayController {
             RestClient.RequestBodySpec spec = restClient.method(method)
                     .uri(URI.create(targetUri))
                     .headers(h -> {
-                        String ct = request.getContentType();
-                        if (ct != null) h.setContentType(MediaType.parseMediaType(ct));
+                        Collections.list(request.getHeaderNames()).forEach(name ->
+                                Collections.list(request.getHeaders(name)).forEach(value ->
+                                        h.add(name, value)));
                     });
 
             if (body != null && body.length > 0) {
