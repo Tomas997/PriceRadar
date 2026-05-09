@@ -25,17 +25,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private JwtService jwtService;
-
-    @InjectMocks
-    private AuthService authService;
+    @Mock private UserRepository userRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtService jwtService;
+    @InjectMocks private AuthService authService;
 
     private User sampleUser() {
         User u = new User("Alice", "alice@example.com", "hashed", Role.USER);
@@ -45,13 +38,13 @@ class AuthServiceTest {
 
     @Test
     void register_savesUserAndReturnsToken() {
-        RegisterRequest request = new RegisterRequest("Alice", "alice@example.com", "password123");
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenReturn(sampleUser());
         when(jwtService.generateToken("alice@example.com", "USER")).thenReturn("jwt-token");
 
-        AuthResponse response = authService.register(request);
+        AuthResponse response = authService.register(
+                new RegisterRequest("Alice", "alice@example.com", "password123", null));
 
         assertThat(response.token()).isEqualTo("jwt-token");
         assertThat(response.email()).isEqualTo("alice@example.com");
@@ -60,11 +53,25 @@ class AuthServiceTest {
     }
 
     @Test
+    void register_passwordIsHashed_notStoredPlaintext() {
+        when(userRepository.existsByEmail(any())).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("$2a$10$hashedvalue");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateToken(any(), any())).thenReturn("token");
+
+        authService.register(new RegisterRequest("Alice", "alice@example.com", "password123", null));
+
+        verify(passwordEncoder).encode("password123");
+        // verify save is called with encoded password, not plaintext
+        verify(userRepository).save(argThat(u -> u.getPassword().equals("$2a$10$hashedvalue")));
+    }
+
+    @Test
     void register_throwsConflict_whenEmailAlreadyExists() {
-        RegisterRequest request = new RegisterRequest("Alice", "alice@example.com", "password123");
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.register(request))
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("Alice", "alice@example.com", "password123", null)))
                 .isInstanceOf(UserAlreadyExistsException.class)
                 .hasMessageContaining("alice@example.com");
 
@@ -73,12 +80,11 @@ class AuthServiceTest {
 
     @Test
     void login_returnsToken_whenCredentialsValid() {
-        LoginRequest request = new LoginRequest("alice@example.com", "password123");
         when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(sampleUser()));
         when(passwordEncoder.matches("password123", "hashed")).thenReturn(true);
         when(jwtService.generateToken("alice@example.com", "USER")).thenReturn("jwt-token");
 
-        AuthResponse response = authService.login(request);
+        AuthResponse response = authService.login(new LoginRequest("alice@example.com", "password123"));
 
         assertThat(response.token()).isEqualTo("jwt-token");
         assertThat(response.username()).isEqualTo("Alice");
@@ -86,20 +92,31 @@ class AuthServiceTest {
 
     @Test
     void login_throwsBadCredentials_whenUserNotFound() {
-        LoginRequest request = new LoginRequest("unknown@example.com", "password");
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(new LoginRequest("unknown@example.com", "password")))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
     @Test
     void login_throwsBadCredentials_whenPasswordWrong() {
-        LoginRequest request = new LoginRequest("alice@example.com", "wrongpassword");
         when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(sampleUser()));
         when(passwordEncoder.matches("wrongpassword", "hashed")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(new LoginRequest("alice@example.com", "wrongpassword")))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void login_sameErrorForWrongUserAndWrongPassword() {
+        when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(sampleUser()));
+        when(passwordEncoder.matches("wrongpassword", "hashed")).thenReturn(false);
+
+        // both scenarios throw same exception type — attacker can't distinguish
+        assertThatThrownBy(() -> authService.login(new LoginRequest("nonexistent@example.com", "pass")))
+                .isInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(() -> authService.login(new LoginRequest("alice@example.com", "wrongpassword")))
                 .isInstanceOf(BadCredentialsException.class);
     }
 

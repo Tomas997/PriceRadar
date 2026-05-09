@@ -33,6 +33,8 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private Role role;
 
+    private String telegramChatId;
+
     public User(String username, String email, String password, Role role) {
         this.username = username;
         this.email = email;

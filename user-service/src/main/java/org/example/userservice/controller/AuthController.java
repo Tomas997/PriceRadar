@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.userservice.dto.AuthResponse;
 import org.example.userservice.dto.LoginRequest;
 import org.example.userservice.dto.RegisterRequest;
+import org.example.userservice.dto.UpdateProfileRequest;
 import org.example.userservice.dto.UserResponse;
 import org.example.userservice.service.AuthService;
 import org.springframework.http.HttpStatus;
@@ -31,5 +32,11 @@ public class AuthController {
     @GetMapping("/me")
     public UserResponse me(java.security.Principal principal) {
         return authService.me(principal.getName());
+    }
+
+    @PatchMapping("/profile")
+    public UserResponse updateProfile(java.security.Principal principal,
+            @RequestBody UpdateProfileRequest request) {
+        return authService.updateProfile(principal.getName(), request);
     }
 }
