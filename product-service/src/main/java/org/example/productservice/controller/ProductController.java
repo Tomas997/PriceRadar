@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.productservice.dto.PriceEntryResponse;
 import org.example.productservice.dto.ProductResponse;
 import org.example.productservice.dto.TrackProductRequest;
+import org.example.productservice.model.Product;
 import org.example.productservice.service.ProductSearchService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -19,11 +20,11 @@ public class ProductController {
     private final ProductSearchService productSearchService;
 
     @GetMapping
-    public List<ProductResponse> getAll() {
-        return productSearchService.getAllTrackedProducts()
-                .stream()
-                .map(ProductResponse::from)
-                .toList();
+    public List<ProductResponse> getAll(@RequestParam(required = false) String userEmail) {
+        List<Product> products = userEmail != null
+                ? productSearchService.getProductsByUser(userEmail)
+                : productSearchService.getAllTrackedProducts();
+        return products.stream().map(ProductResponse::from).toList();
     }
 
     @GetMapping("/search")

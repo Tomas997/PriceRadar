@@ -8,5 +8,6 @@ public record TrackProductRequest(
         @NotBlank String title,
         @Min(0) long price,
         @NotBlank String url,
-        boolean inStock
+        boolean inStock,
+        String userEmail
 ) {}

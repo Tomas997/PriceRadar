@@ -18,11 +18,19 @@ public class Product {
     private String marketplace;
     private String url;
     private Boolean inStock;
+    private String userEmail;
+    private Long latestPrice;
 
     public Product(String title, String marketplace, String url, Boolean inStock) {
+        this(title, marketplace, url, inStock, null, null);
+    }
+
+    public Product(String title, String marketplace, String url, Boolean inStock, String userEmail, Long latestPrice) {
         this.title = title;
         this.marketplace = marketplace;
         this.url = url;
         this.inStock = inStock;
+        this.userEmail = userEmail;
+        this.latestPrice = latestPrice;
     }
 }

@@ -7,7 +7,9 @@ public record ProductResponse(
         String title,
         String marketplace,
         String url,
-        Boolean inStock
+        Boolean inStock,
+        String userEmail,
+        Long latestPrice
 ) {
     public static ProductResponse from(Product product) {
         return new ProductResponse(
@@ -15,7 +17,9 @@ public record ProductResponse(
                 product.getTitle(),
                 product.getMarketplace(),
                 product.getUrl(),
-                product.getInStock()
+                product.getInStock(),
+                product.getUserEmail(),
+                product.getLatestPrice()
         );
     }
 }

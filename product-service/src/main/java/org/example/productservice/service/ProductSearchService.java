@@ -28,15 +28,21 @@ public class ProductSearchService {
                 request.title(),
                 request.marketplace(),
                 request.url(),
-                request.inStock()
+                request.inStock(),
+                request.userEmail(),
+                request.price()
         ));
         priceEntryRepository.save(new PriceEntry(product.getId(), request.price()));
-        log.info("Tracking product id={} title={}", product.getId(), product.getTitle());
+        log.info("Tracking product id={} title={} user={}", product.getId(), product.getTitle(), product.getUserEmail());
         return product;
     }
 
     public List<Product> getAllTrackedProducts() {
         return productRepository.findAll();
+    }
+
+    public List<Product> getProductsByUser(String userEmail) {
+        return productRepository.findByUserEmail(userEmail);
     }
 
     public Product getProductById(Long id) {
