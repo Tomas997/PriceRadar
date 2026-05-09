@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Profile – PriceRadar</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; background: #0f0f1a; color: #ddd; margin: 0; }
+    .container { max-width: 500px; margin: 40px auto; padding: 24px; }
+    h1 { color: #e94560; font-size: 22px; }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1e1e30; font-size: 14px; }
+    .info-label { color: #888; }
+    .section { background: #1a1a2e; border-radius: 6px; padding: 20px; margin-top: 24px; }
+    .section h2 { font-size: 16px; color: #aaa; margin-top: 0; }
+    label { display: block; font-size: 13px; color: #aaa; margin-top: 12px; }
+    input { width: 100%; padding: 8px; margin-top: 4px; background: #0f0f1a; border: 1px solid #333; color: #ddd; border-radius: 4px; }
+    button { padding: 9px 22px; margin-top: 16px; background: #e94560; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .alert { padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 14px; }
+    .alert-success { background: #1a3a2e; color: #4ade80; }
+  </style>
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+<div class="container">
+  <h1>Profile</h1>
+  <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+
+  <div class="info-row">
+    <span class="info-label">Username</span>
+    <span th:text="${user.username}">-</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Email</span>
+    <span th:text="${user.email}">-</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Role</span>
+    <span th:text="${user.role}">-</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Telegram Chat ID</span>
+    <span th:text="${user.telegramChatId != null ? user.telegramChatId : '—'}">-</span>
+  </div>
+
+  <div class="section">
+    <h2>Telegram-сповіщення</h2>
+    <div style="background:#0f0f1a;border-radius:6px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.7">
+      <p style="margin:0 0 10px;color:#aaa;font-weight:bold">Як налаштувати сповіщення:</p>
+      <ol style="margin:0;padding-left:18px;color:#888">
+        <li>Відкрийте Telegram і знайдіть бота
+          <a href="https://t.me/price_radar_KPI_bot" target="_blank" style="color:#7eb8f7">@price_radar_KPI_bot</a>
+        </li>
+        <li>Натисніть кнопку <strong style="color:#ddd">Start</strong> — це обов'язково, інакше бот не зможе вам писати</li>
+        <li>Відкрийте бота
+          <a href="https://t.me/userinfobot" target="_blank" style="color:#7eb8f7">@userinfobot</a>
+          і натисніть Start — він покаже ваш числовий <strong style="color:#ddd">Chat ID</strong>
+        </li>
+        <li>Вставте цей ID у поле нижче і натисніть <strong style="color:#ddd">Зберегти</strong></li>
+      </ol>
+      <p style="margin:10px 0 0;color:#555;font-size:12px">
+        Щодня о 10:00 PriceRadar перевіряє ціни. Якщо мінімальна ціна у вашій групі змінилась — ви отримаєте повідомлення у Telegram.
+      </p>
+    </div>
+    <form method="post" th:action="@{/profile}">
+      <label>Telegram Chat ID</label>
+      <input type="text" name="telegramChatId" placeholder="123456789"
+             th:value="${user.telegramChatId}">
+      <button type="submit">Зберегти</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

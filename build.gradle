@@ -23,6 +23,9 @@ subprojects {
 
     tasks.named('test') {
         useJUnitPlatform()
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+        }
     }
 }
 
@@ -30,14 +33,15 @@ subprojects {
 tasks.register('bootRunAll') {
     group = 'application'
     description = 'Start parser-service, product-service and api-gateway in parallel'
-    dependsOn ':parser-service:bootJar', ':product-service:bootJar', ':api-gateway:bootJar', ':user-service:bootJar'
+    dependsOn ':parser-service:bootJar', ':product-service:bootJar', ':api-gateway:bootJar', ':user-service:bootJar', ':frontend-service:bootJar'
 
     doLast {
         def services = [
-            [jar: 'parser-service/build/libs',  port: '8082'],
-            [jar: 'product-service/build/libs', port: '8081'],
-            [jar: 'user-service/build/libs',    port: '8083'],
-            [jar: 'api-gateway/build/libs',     port: '8080'],
+            [jar: 'parser-service/build/libs',   port: '8082'],
+            [jar: 'product-service/build/libs',  port: '8081'],
+            [jar: 'user-service/build/libs',     port: '8083'],
+            [jar: 'frontend-service/build/libs', port: '8084'],
+            [jar: 'api-gateway/build/libs',      port: '8080'],
         ]
         services.each { svc ->
             def jarFile = fileTree(svc.jar).filter { it.name.endsWith('.jar') }.singleFile

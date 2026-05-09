@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Login – PriceRadar</title>
+  <style>
+    body { font-family: sans-serif; background: #0f0f1a; color: #ddd; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: #1a1a2e; padding: 36px; border-radius: 8px; width: 320px; }
+    h2 { color: #e94560; margin-top: 0; }
+    label { display: block; margin-top: 12px; font-size: 13px; color: #aaa; }
+    input { width: 100%; padding: 8px; margin-top: 4px; background: #0f0f1a; border: 1px solid #333; color: #ddd; border-radius: 4px; box-sizing: border-box; }
+    button { width: 100%; padding: 10px; margin-top: 20px; background: #e94560; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 15px; }
+    .error { color: #e94560; font-size: 13px; margin-top: 10px; }
+    .link { text-align: center; margin-top: 14px; font-size: 13px; }
+    .link a { color: #e94560; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>Sign in</h2>
+  <div class="error" th:if="${error}" th:text="${error}"></div>
+  <form method="post" th:action="@{/login}">
+    <label>Email</label>
+    <input type="email" name="email" required autofocus>
+    <label>Password</label>
+    <input type="password" name="password" required>
+    <button type="submit">Login</button>
+  </form>
+  <div class="link">No account? <a th:href="@{/register}">Register</a></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="navbar">
+  <div style="background:#1a1a2e;padding:12px 24px;display:flex;align-items:center;gap:24px;">
+    <span style="color:#e94560;font-weight:bold;font-size:18px;">PriceRadar</span>
+    <a th:href="@{/search}" style="color:#ccc;text-decoration:none;">Search</a>
+    <a th:href="@{/tracked}" style="color:#ccc;text-decoration:none;">Tracked</a>
+    <a th:href="@{/profile}" style="color:#ccc;text-decoration:none;">Profile</a>
+    <span style="margin-left:auto;color:#888;" th:text="${username}"></span>
+    <a th:href="@{/logout}" style="color:#e94560;text-decoration:none;">Logout</a>
+  </div>
+</nav>
+</body>
+</html>

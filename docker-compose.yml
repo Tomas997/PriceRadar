@@ -70,5 +70,16 @@ services:
       - user-service
     restart: on-failure
 
+  frontend-service:
+    build: ./frontend-service
+    container_name: priceradar-frontend
+    ports:
+      - "8084:8084"
+    environment:
+      GATEWAY_URL: http://api-gateway:8080
+    depends_on:
+      - api-gateway
+    restart: on-failure
+
 volumes:
   postgres_data:
