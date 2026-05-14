@@ -3,8 +3,10 @@ package org.example.productservice.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.productservice.dto.MarketplaceSearchResult;
+import org.example.productservice.model.GroupPriceEntry;
 import org.example.productservice.model.TrackedGroup;
 import org.example.productservice.model.TrackedItem;
+import org.example.productservice.repository.GroupPriceEntryRepository;
 import org.example.productservice.repository.TrackedGroupRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -15,8 +17,9 @@ import org.springframework.web.client.RestClient;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -24,6 +27,7 @@ import java.util.List;
 public class PriceCheckScheduler {
 
     private final TrackedGroupRepository groupRepo;
+    private final GroupPriceEntryRepository priceEntryRepo;
     private final TelegramNotificationService telegramService;
 
     @Value("${parser.service.url:http://localhost:8082}")
@@ -60,7 +64,10 @@ public class PriceCheckScheduler {
         Long newMin = null;
         for (TrackedItem item : group.getItems()) {
             Long fresh = fetchPrice(item);
-            if (fresh != null) item.setCurrentPrice(fresh);
+            if (fresh != null) {
+                item.setCurrentPrice(fresh);
+                saveIfNeeded(item.getId(), item.getMarketplace(), fresh);
+            }
             Long price = item.getCurrentPrice();
             if (price != null && (newMin == null || price < newMin)) newMin = price;
         }
@@ -84,16 +91,36 @@ public class PriceCheckScheduler {
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
             if (results == null) return null;
-            return results.stream()
+            Long price = results.stream()
                     .filter(r -> r.marketplace().equalsIgnoreCase(item.getMarketplace()))
                     .flatMap(r -> r.products().stream())
                     .filter(p -> item.getUrl().equals(p.url()))
                     .map(p -> Long.valueOf(p.price()))
                     .findFirst()
                     .orElse(null);
+            if (price != null) {
+                log.debug("fetchPrice item id={} [{}] → {} грн", item.getId(), item.getMarketplace(), price);
+            } else {
+                log.warn("fetchPrice item id={} [{}]: no URL match for '{}'", item.getId(), item.getMarketplace(), item.getUrl());
+            }
+            return price;
         } catch (Exception e) {
-            log.warn("Could not fetch price for item id={}: {}", item.getId(), e.getMessage());
+            log.warn("fetchPrice item id={} [{}]: {}", item.getId(), item.getMarketplace(), e.getMessage());
             return null;
+        }
+    }
+
+    private void saveIfNeeded(Long itemId, String marketplace, Long price) {
+        Optional<GroupPriceEntry> last = priceEntryRepo.findTopByTrackedItemIdOrderByRecordedAtDesc(itemId);
+        boolean noEntryToday = last.isEmpty()
+                || !last.get().getRecordedAt().toLocalDate().equals(LocalDate.now());
+        boolean priceChanged = last.isEmpty() || !last.get().getPrice().equals(price);
+        if (noEntryToday || priceChanged) {
+            priceEntryRepo.save(new GroupPriceEntry(itemId, marketplace, price));
+            log.debug("Saved price entry item id={} price={} (noEntryToday={}, priceChanged={})",
+                    itemId, price, noEntryToday, priceChanged);
+        } else {
+            log.debug("Skipped duplicate entry item id={} price={} — already recorded today", itemId, price);
         }
     }
 

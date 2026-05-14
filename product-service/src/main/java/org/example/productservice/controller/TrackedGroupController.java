@@ -2,6 +2,7 @@ package org.example.productservice.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.productservice.dto.CreateTrackedGroupRequest;
+import org.example.productservice.dto.GroupPriceHistoryResponse;
 import org.example.productservice.dto.TrackedGroupResponse;
 import org.example.productservice.service.GroupTrackingService;
 import org.example.productservice.service.PriceCheckScheduler;
@@ -46,6 +47,23 @@ public class TrackedGroupController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void triggerCheck() {
         priceCheckScheduler.checkPrices();
+    }
+
+    @GetMapping("/{id}/history")
+    public GroupPriceHistoryResponse getHistory(@PathVariable Long id) {
+        return groupTrackingService.getGroupHistory(id);
+    }
+
+    @PostMapping("/{id}/seed-history")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void seedHistory(@PathVariable Long id) {
+        groupTrackingService.seedDemoHistory(id);
+    }
+
+    @DeleteMapping("/{id}/demo-history")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void clearDemoHistory(@PathVariable Long id) {
+        groupTrackingService.clearDemoHistory(id);
     }
 
     @PostMapping("/{id}/simulate-price-change")
