@@ -25,6 +25,8 @@
     .test-btn:hover { background: #7eb8f7; color: #0f0f1a; }
     .delete-btn { padding: 5px 12px; background: transparent; border: 1px solid #e94560; color: #e94560; border-radius: 4px; cursor: pointer; font-size: 12px; }
     .delete-btn:hover { background: #e94560; color: white; }
+    .trend-btn { padding: 5px 12px; background: transparent; border: 1px solid #a78bfa; color: #a78bfa; border-radius: 4px; font-size: 12px; text-decoration: none; display: inline-block; }
+    .trend-btn:hover { background: #a78bfa; color: #0f0f1a; }
     .group-items { padding: 0 18px 14px; }
     .item-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid #13132a; }
     .item-row:last-child { border-bottom: none; }
@@ -80,6 +82,7 @@
               th:text="${group.createdAt != null and #strings.length(group.createdAt) >= 10 ? #strings.substring(group.createdAt, 0, 10) : ''}"></span>
 
         <div class="header-actions">
+          <a class="trend-btn" th:href="@{'/trends/' + ${group.id}}" title="Графік тенденції цін">📈 Графік</a>
           <form method="post" th:action="@{'/tracked/test-notify/' + ${group.id}}">
             <button type="submit" class="test-btn" title="Надіслати тестове сповіщення у Telegram">Тест</button>
           </form>

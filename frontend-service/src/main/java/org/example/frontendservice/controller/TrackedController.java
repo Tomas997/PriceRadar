@@ -1,10 +1,13 @@
 package org.example.frontendservice.controller;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.frontendservice.client.GatewayClient;
+import org.example.frontendservice.dto.GroupPriceHistoryResponse;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +27,7 @@ import java.util.Map;
 public class TrackedController {
 
     private final GatewayClient gatewayClient;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/tracked")
     public String tracked(HttpSession session, Model model) {
@@ -123,6 +127,68 @@ public class TrackedController {
             ra.addFlashAttribute("error", "Помилка при запуску перевірки");
         }
         return "redirect:/tracked";
+    }
+
+    @PostMapping("/trends/{groupId}/seed")
+    public String seedHistory(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
+        String token = (String) session.getAttribute("token");
+        if (token == null) return "redirect:/login";
+        try {
+            gatewayClient.seedDemoHistory(token, groupId);
+            ra.addFlashAttribute("success", "Тестові дані за 7 днів згенеровано");
+        } catch (Exception e) {
+            log.error("Seed history failed for group {}: {}", groupId, e.getMessage());
+            ra.addFlashAttribute("error", "Не вдалося згенерувати дані");
+        }
+        return "redirect:/trends/" + groupId;
+    }
+
+    @PostMapping("/trends/{groupId}/clear-demo")
+    public String clearDemoHistory(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
+        String token = (String) session.getAttribute("token");
+        if (token == null) return "redirect:/login";
+        try {
+            gatewayClient.clearDemoHistory(token, groupId);
+            ra.addFlashAttribute("success", "Тестові дані видалено");
+        } catch (Exception e) {
+            log.error("Clear demo history failed for group {}: {}", groupId, e.getMessage());
+            ra.addFlashAttribute("error", "Не вдалося видалити тестові дані");
+        }
+        return "redirect:/trends/" + groupId;
+    }
+
+    @GetMapping("/trends/{groupId}")
+    public String trends(@PathVariable Long groupId, HttpSession session, Model model) {
+        String token = (String) session.getAttribute("token");
+        if (token == null) return "redirect:/login";
+
+        model.addAttribute("username", session.getAttribute("username"));
+        model.addAttribute("groupId", groupId);
+
+        try {
+            GroupPriceHistoryResponse history = gatewayClient.getGroupHistory(token, groupId);
+            model.addAttribute("series", history.series());
+            model.addAttribute("historyJson", objectMapper.writeValueAsString(history.series()));
+            boolean fewPoints = history.series().stream()
+                    .mapToInt(s -> s.entries().size())
+                    .max().orElse(0) < 2;
+            model.addAttribute("fewPoints", fewPoints);
+            model.addAttribute("hasDemo", history.hasDemo());
+        } catch (JacksonException e) {
+            log.error("JSON serialization error for group {}: {}", groupId, e.getMessage());
+            model.addAttribute("series", java.util.Collections.emptyList());
+            model.addAttribute("historyJson", "[]");
+            model.addAttribute("fewPoints", false);
+            model.addAttribute("hasDemo", false);
+        } catch (Exception e) {
+            log.error("Failed to load history for group {}: {}", groupId, e.getMessage());
+            model.addAttribute("error", "Не вдалося завантажити дані для графіку");
+            model.addAttribute("series", java.util.Collections.emptyList());
+            model.addAttribute("historyJson", "[]");
+            model.addAttribute("fewPoints", false);
+            model.addAttribute("hasDemo", false);
+        }
+        return "trends";
     }
 
     private Map<String, Object> parseItem(String encoded) {
