@@ -27,6 +27,18 @@ subprojects {
             events 'passed', 'skipped', 'failed'
         }
     }
+
+    // Автоматично підвантажує змінні з кореневого .env при bootRun
+    plugins.withId('org.springframework.boot') {
+        tasks.named('bootRun') {
+            def envFile = rootProject.file('.env')
+            if (envFile.exists()) {
+                def props = new Properties()
+                envFile.withInputStream { props.load(it) }
+                environment props
+            }
+        }
+    }
 }
 
 // Запускає всі три сервіси паралельно у фоні (Windows: start, Linux/Mac: & )
@@ -36,6 +48,14 @@ tasks.register('bootRunAll') {
     dependsOn ':parser-service:bootJar', ':product-service:bootJar', ':api-gateway:bootJar', ':user-service:bootJar', ':frontend-service:bootJar'
 
     doLast {
+        def envVars = [:]
+        def envFile = rootProject.file('.env')
+        if (envFile.exists()) {
+            def props = new Properties()
+            envFile.withInputStream { props.load(it) }
+            props.each { k, v -> envVars[k.toString()] = v.toString() }
+        }
+
         def services = [
             [jar: 'parser-service/build/libs',   port: '8082'],
             [jar: 'product-service/build/libs',  port: '8081'],
@@ -46,10 +66,11 @@ tasks.register('bootRunAll') {
         services.each { svc ->
             def jarFile = fileTree(svc.jar).filter { it.name.endsWith('.jar') }.singleFile
             def cmd = ['java', '-jar', jarFile.absolutePath]
-            new ProcessBuilder(cmd)
-                .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-                .redirectError(ProcessBuilder.Redirect.INHERIT)
-                .start()
+            def pb = new ProcessBuilder(cmd)
+            pb.environment().putAll(envVars)
+            pb.redirectOutput(ProcessBuilder.Redirect.INHERIT)
+              .redirectError(ProcessBuilder.Redirect.INHERIT)
+              .start()
             println "Started ${jarFile.name} on :${svc.port}"
         }
         println "\nAll services started. Press Ctrl+C to stop."
