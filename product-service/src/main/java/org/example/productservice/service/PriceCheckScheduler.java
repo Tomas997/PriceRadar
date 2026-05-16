@@ -3,9 +3,12 @@ package org.example.productservice.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.productservice.dto.MarketplaceSearchResult;
+import org.example.productservice.model.CatalogItem;
 import org.example.productservice.model.GroupPriceEntry;
+import org.example.productservice.model.ProductCandidate;
 import org.example.productservice.model.TrackedGroup;
 import org.example.productservice.model.TrackedItem;
+import org.example.productservice.repository.CatalogItemRepository;
 import org.example.productservice.repository.GroupPriceEntryRepository;
 import org.example.productservice.repository.TrackedGroupRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,11 +17,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
+
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -26,51 +33,95 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PriceCheckScheduler {
 
+    private final CatalogItemRepository catalogItemRepo;
     private final TrackedGroupRepository groupRepo;
     private final GroupPriceEntryRepository priceEntryRepo;
     private final TelegramNotificationService telegramService;
+
+    @Value("${price.check.hour:10}")
+    private int checkHour;
+
+    public int getCheckHour() { return checkHour; }
 
     @Value("${parser.service.url:http://localhost:8082}")
     private String parserUrl;
 
     private final RestClient restClient = RestClient.create();
 
-    @Scheduled(cron = "0 0 10 * * *")
+    @Scheduled(cron = "${price.check.cron:0 0 10 * * *}")
     @Transactional
     public void checkPrices() {
         log.info("Daily price check started");
-        for (TrackedGroup group : groupRepo.findAll()) {
+
+        for (CatalogItem item : catalogItemRepo.findAll()) {
             try {
-                processGroup(group);
+                Long fresh = fetchPrice(item);
+                if (fresh != null) {
+                    item.setCurrentPrice(fresh);
+                    item.setLastParsedAt(LocalDateTime.now());
+                    catalogItemRepo.save(item);
+                    saveIfNeeded(item.getId(), item.getMarketplace(), fresh);
+                }
             } catch (Exception e) {
-                log.error("Error processing group id={}: {}", group.getId(), e.getMessage());
+                log.error("Error updating catalog item id={}: {}", item.getId(), e.getMessage());
             }
         }
+
+        for (TrackedGroup group : groupRepo.findAll()) {
+            try {
+                recalculateGroupMin(group);
+            } catch (Exception e) {
+                log.error("Error recalculating group id={}: {}", group.getId(), e.getMessage());
+            }
+        }
+
         log.info("Daily price check completed");
     }
 
     @Transactional
     public void checkGroup(Long groupId) {
         groupRepo.findById(groupId).ifPresent(group -> {
-            try {
-                processGroup(group);
-            } catch (Exception e) {
-                log.error("Error processing group id={}: {}", groupId, e.getMessage());
+            for (TrackedItem item : group.getItems()) {
+                CatalogItem ci = item.getCatalogItem();
+                if (!isStale(ci)) {
+                    log.debug("CatalogItem id={} is fresh, skipping fetch", ci.getId());
+                    continue;
+                }
+                try {
+                    Long fresh = fetchPrice(ci);
+                    if (fresh != null) {
+                        ci.setCurrentPrice(fresh);
+                        ci.setLastParsedAt(LocalDateTime.now());
+                        catalogItemRepo.save(ci);
+                        saveIfNeeded(ci.getId(), ci.getMarketplace(), fresh);
+                    }
+                } catch (Exception e) {
+                    log.error("Error updating catalog item id={}: {}", ci.getId(), e.getMessage());
+                }
             }
+            recalculateGroupMin(group);
         });
     }
 
-    void processGroup(TrackedGroup group) {
-        Long newMin = null;
-        for (TrackedItem item : group.getItems()) {
-            Long fresh = fetchPrice(item);
-            if (fresh != null) {
-                item.setCurrentPrice(fresh);
-                saveIfNeeded(item.getId(), item.getMarketplace(), fresh);
-            }
-            Long price = item.getCurrentPrice();
-            if (price != null && (newMin == null || price < newMin)) newMin = price;
-        }
+    public boolean isButtonVisible() {
+        LocalTime now = LocalTime.now();
+        LocalTime windowStart = LocalTime.of(Math.max(0, checkHour - 4), 0);
+        LocalTime windowEnd = LocalTime.of(Math.min(23, checkHour + 4), 0);
+        return now.isBefore(windowStart) || now.isAfter(windowEnd);
+    }
+
+    boolean isStale(CatalogItem item) {
+        if (item.getLastParsedAt() == null) return true;
+        return item.getLastParsedAt().isBefore(LocalDateTime.now().minusHours(4));
+    }
+
+    void recalculateGroupMin(TrackedGroup group) {
+        Long newMin = group.getItems().stream()
+                .map(item -> item.getCatalogItem().getCurrentPrice())
+                .filter(Objects::nonNull)
+                .min(Long::compareTo)
+                .orElse(null);
+
         if (newMin == null) return;
 
         Long oldMin = group.getLastMinPrice();
@@ -82,7 +133,7 @@ public class PriceCheckScheduler {
         }
     }
 
-    private Long fetchPrice(TrackedItem item) {
+    private Long fetchPrice(CatalogItem item) {
         try {
             String encoded = URLEncoder.encode(item.getTitle(), StandardCharsets.UTF_8);
             URI uri = URI.create(parserUrl + "/api/search?query=" + encoded);
@@ -95,32 +146,31 @@ public class PriceCheckScheduler {
                     .filter(r -> r.marketplace().equalsIgnoreCase(item.getMarketplace()))
                     .flatMap(r -> r.products().stream())
                     .filter(p -> item.getUrl().equals(p.url()))
-                    .map(p -> Long.valueOf(p.price()))
+                    .map(ProductCandidate::price)
                     .findFirst()
                     .orElse(null);
             if (price != null) {
-                log.debug("fetchPrice item id={} [{}] → {} грн", item.getId(), item.getMarketplace(), price);
+                log.debug("fetchPrice catalogItem id={} [{}] -> {} грн", item.getId(), item.getMarketplace(), price);
             } else {
-                log.warn("fetchPrice item id={} [{}]: no URL match for '{}'", item.getId(), item.getMarketplace(), item.getUrl());
+                log.warn("fetchPrice catalogItem id={} [{}]: no URL match for '{}'", item.getId(), item.getMarketplace(), item.getUrl());
             }
             return price;
         } catch (Exception e) {
-            log.warn("fetchPrice item id={} [{}]: {}", item.getId(), item.getMarketplace(), e.getMessage());
+            log.warn("fetchPrice catalogItem id={} [{}]: {}", item.getId(), item.getMarketplace(), e.getMessage());
             return null;
         }
     }
 
-    private void saveIfNeeded(Long itemId, String marketplace, Long price) {
-        Optional<GroupPriceEntry> last = priceEntryRepo.findTopByTrackedItemIdOrderByRecordedAtDesc(itemId);
+    private void saveIfNeeded(Long catalogItemId, String marketplace, Long price) {
+        Optional<GroupPriceEntry> last = priceEntryRepo.findTopByCatalogItemIdOrderByRecordedAtDesc(catalogItemId);
         boolean noEntryToday = last.isEmpty()
                 || !last.get().getRecordedAt().toLocalDate().equals(LocalDate.now());
         boolean priceChanged = last.isEmpty() || !last.get().getPrice().equals(price);
         if (noEntryToday || priceChanged) {
-            priceEntryRepo.save(new GroupPriceEntry(itemId, marketplace, price));
-            log.debug("Saved price entry item id={} price={} (noEntryToday={}, priceChanged={})",
-                    itemId, price, noEntryToday, priceChanged);
+            priceEntryRepo.save(new GroupPriceEntry(catalogItemId, marketplace, price));
+            log.debug("Saved price entry catalogItem id={} price={}", catalogItemId, price);
         } else {
-            log.debug("Skipped duplicate entry item id={} price={} — already recorded today", itemId, price);
+            log.debug("Skipped duplicate entry catalogItem id={} — already recorded today", catalogItemId);
         }
     }
 
@@ -131,10 +181,11 @@ public class PriceCheckScheduler {
         sb.append("Нова мін. ціна: <b>").append(newMin).append(" грн</b>\n\n");
         sb.append("Товари у групі:\n");
         for (TrackedItem item : group.getItems()) {
-            sb.append("• <b>[").append(item.getMarketplace()).append("]</b> ")
-              .append(item.getTitle())
-              .append(" — ").append(item.getCurrentPrice() != null ? item.getCurrentPrice() + " грн" : "N/A")
-              .append("\n  <a href=\"").append(item.getUrl()).append("\">Переглянути</a>\n");
+            CatalogItem ci = item.getCatalogItem();
+            sb.append("• <b>[").append(ci.getMarketplace()).append("]</b> ")
+              .append(ci.getTitle())
+              .append(" — ").append(ci.getCurrentPrice() != null ? ci.getCurrentPrice() + " грн" : "N/A")
+              .append("\n  <a href=\"").append(ci.getUrl()).append("\">Переглянути</a>\n");
         }
         return sb.toString();
     }
