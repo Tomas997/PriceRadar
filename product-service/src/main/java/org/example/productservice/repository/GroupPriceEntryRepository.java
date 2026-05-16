@@ -9,11 +9,13 @@ import java.util.Optional;
 
 @Repository
 public interface GroupPriceEntryRepository extends JpaRepository<GroupPriceEntry, Long> {
-    List<GroupPriceEntry> findByTrackedItemIdInOrderByRecordedAtAsc(List<Long> trackedItemIds);
+    List<GroupPriceEntry> findByCatalogItemIdInOrderByRecordedAtAsc(List<Long> catalogItemIds);
 
-    Optional<GroupPriceEntry> findTopByTrackedItemIdOrderByRecordedAtDesc(Long trackedItemId);
+    Optional<GroupPriceEntry> findTopByCatalogItemIdOrderByRecordedAtDesc(Long catalogItemId);
 
-    boolean existsByTrackedItemIdInAndDemoTrue(List<Long> trackedItemIds);
+    boolean existsByCatalogItemId(Long catalogItemId);
 
-    void deleteByTrackedItemIdInAndDemoTrue(List<Long> trackedItemIds);
+    boolean existsByCatalogItemIdInAndDemoTrue(List<Long> catalogItemIds);
+
+    void deleteByCatalogItemIdInAndDemoTrue(List<Long> catalogItemIds);
 }

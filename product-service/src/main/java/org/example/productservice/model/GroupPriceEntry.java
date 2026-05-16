@@ -16,7 +16,7 @@ public class GroupPriceEntry {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long trackedItemId;
+    private Long catalogItemId;
     private String marketplace;
     private Long price;
     private LocalDateTime recordedAt;
@@ -24,8 +24,8 @@ public class GroupPriceEntry {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean demo;
 
-    public GroupPriceEntry(Long trackedItemId, String marketplace, Long price) {
-        this.trackedItemId = trackedItemId;
+    public GroupPriceEntry(Long catalogItemId, String marketplace, Long price) {
+        this.catalogItemId = catalogItemId;
         this.marketplace = marketplace;
         this.price = price;
         this.recordedAt = LocalDateTime.now();

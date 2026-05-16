@@ -18,8 +18,7 @@ public class TrackedItem {
     @JoinColumn(name = "group_id")
     private TrackedGroup group;
 
-    private String marketplace;
-    private String title;
-    private String url;
-    private Long currentPrice;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "catalog_item_id")
+    private CatalogItem catalogItem;
 }
