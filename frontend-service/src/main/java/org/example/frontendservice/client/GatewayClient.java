@@ -2,6 +2,7 @@ package org.example.frontendservice.client;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.frontendservice.dto.AuthResponse;
+import org.example.frontendservice.dto.CheckConfigResponse;
 import org.example.frontendservice.dto.GroupPriceHistoryResponse;
 import org.example.frontendservice.dto.MarketplaceSearchResult;
 import org.example.frontendservice.dto.TrackedGroupResponse;
@@ -155,6 +156,22 @@ public class GatewayClient {
     public void clearDemoHistory(String token, Long groupId) {
         restClient.delete()
                 .uri("/api/groups/{id}/demo-history", groupId)
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    public CheckConfigResponse getCheckConfig(String token) {
+        return restClient.get()
+                .uri("/api/groups/check-config")
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(CheckConfigResponse.class);
+    }
+
+    public void checkGroupPrices(String token, Long groupId) {
+        restClient.post()
+                .uri("/api/groups/{id}/check-prices", groupId)
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .toBodilessEntity();

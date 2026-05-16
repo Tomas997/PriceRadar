@@ -43,6 +43,15 @@ public class TrackedController {
             model.addAttribute("error", "Не вдалося завантажити групи. Спробуйте пізніше.");
             model.addAttribute("groups", java.util.Collections.emptyList());
         }
+        try {
+            var cfg = gatewayClient.getCheckConfig(token);
+            model.addAttribute("showCheckButton", cfg.buttonVisible());
+            model.addAttribute("checkHour", cfg.checkHour());
+        } catch (Exception e) {
+            log.warn("Failed to load check config: {}", e.getMessage());
+            model.addAttribute("showCheckButton", true);
+            model.addAttribute("checkHour", 10);
+        }
         return "tracked";
     }
 
@@ -125,6 +134,21 @@ public class TrackedController {
             ra.addFlashAttribute("success", "Перевірку цін запущено. Сповіщення надійде якщо ціна змінилась");
         } catch (RestClientResponseException e) {
             ra.addFlashAttribute("error", "Помилка при запуску перевірки");
+        }
+        return "redirect:/tracked";
+    }
+
+    @PostMapping("/tracked/check-group/{groupId}")
+    public String checkGroupPrices(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
+        String token = (String) session.getAttribute("token");
+        if (token == null) return "redirect:/login";
+
+        try {
+            gatewayClient.checkGroupPrices(token, groupId);
+            ra.addFlashAttribute("success", "Ціни перевірено. Сповіщення надійде якщо мінімальна ціна змінилась");
+        } catch (RestClientResponseException e) {
+            log.warn("Check group prices failed: {}", e.getMessage());
+            ra.addFlashAttribute("error", "Помилка при перевірці цін");
         }
         return "redirect:/tracked";
     }

@@ -7,7 +7,8 @@ public record TrackedGroupResponse(
         String userEmail,
         Long lastMinPrice,
         String createdAt,
-        List<TrackedItemResponse> items
+        List<TrackedItemResponse> items,
+        boolean hasStaleItems
 ) {
     public TrackedItemResponse minPriceItem() {
         if (items == null || items.isEmpty()) return null;
