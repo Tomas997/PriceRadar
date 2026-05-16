@@ -10,9 +10,10 @@ public record TrackedGroupResponse(
         String userEmail,
         Long lastMinPrice,
         LocalDateTime createdAt,
-        List<TrackedItemResponse> items
+        List<TrackedItemResponse> items,
+        boolean hasStaleItems
 ) {
-    public static TrackedGroupResponse from(TrackedGroup group) {
+    public static TrackedGroupResponse from(TrackedGroup group, boolean hasStaleItems) {
         List<TrackedItemResponse> items = group.getItems().stream()
                 .map(TrackedItemResponse::from)
                 .toList();
@@ -21,7 +22,8 @@ public record TrackedGroupResponse(
                 group.getUserEmail(),
                 group.getLastMinPrice(),
                 group.getCreatedAt(),
-                items
+                items,
+                hasStaleItems
         );
     }
 }

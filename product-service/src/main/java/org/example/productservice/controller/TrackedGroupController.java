@@ -1,6 +1,7 @@
 package org.example.productservice.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.productservice.dto.CheckConfigResponse;
 import org.example.productservice.dto.CreateTrackedGroupRequest;
 import org.example.productservice.dto.GroupPriceHistoryResponse;
 import org.example.productservice.dto.TrackedGroupResponse;
@@ -47,6 +48,17 @@ public class TrackedGroupController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void triggerCheck() {
         priceCheckScheduler.checkPrices();
+    }
+
+    @GetMapping("/check-config")
+    public CheckConfigResponse getCheckConfig() {
+        return new CheckConfigResponse(priceCheckScheduler.getCheckHour(), priceCheckScheduler.isButtonVisible());
+    }
+
+    @PostMapping("/{id}/check-prices")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void checkGroupPrices(@PathVariable Long id) {
+        priceCheckScheduler.checkGroup(id);
     }
 
     @GetMapping("/{id}/history")
