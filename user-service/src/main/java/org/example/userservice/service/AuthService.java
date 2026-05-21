@@ -8,6 +8,7 @@ import org.example.userservice.dto.RegisterRequest;
 import org.example.userservice.dto.UpdateProfileRequest;
 import org.example.userservice.dto.UserResponse;
 import org.example.userservice.exception.UserAlreadyExistsException;
+import org.example.userservice.model.RefreshToken;
 import org.example.userservice.model.Role;
 import org.example.userservice.model.User;
 import org.example.userservice.repository.UserRepository;
@@ -27,6 +28,7 @@ public class AuthService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final LoginRateLimiter loginRateLimiter;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
@@ -43,8 +45,7 @@ public class AuthService implements UserDetailsService {
         }
         userRepository.save(user);
         log.info("Registered new user email={}", user.getEmail());
-        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getDisplayName(), user.getEmail(), user.getRole().name(), user.getTelegramChatId());
+        return buildResponse(user);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -55,8 +56,21 @@ public class AuthService implements UserDetailsService {
             throw new BadCredentialsException("Invalid credentials");
         }
         log.info("User logged in email={}", user.getEmail());
-        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getDisplayName(), user.getEmail(), user.getRole().name(), user.getTelegramChatId());
+        return buildResponse(user);
+    }
+
+    public AuthResponse refresh(String refreshTokenStr) {
+        RefreshToken newRefresh = refreshTokenService.rotate(refreshTokenStr);
+        User user = userRepository.findByEmail(newRefresh.getUserEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        log.info("Refreshed tokens for email={}", user.getEmail());
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name());
+        return new AuthResponse(accessToken, newRefresh.getToken(),
+                user.getDisplayName(), user.getEmail(), user.getRole().name(), user.getTelegramChatId());
+    }
+
+    public void logout(String refreshTokenStr) {
+        refreshTokenService.revoke(refreshTokenStr);
     }
 
     public UserResponse me(String email) {
@@ -80,5 +94,12 @@ public class AuthService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+    }
+
+    private AuthResponse buildResponse(User user) {
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name());
+        String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
+        return new AuthResponse(accessToken, refreshToken,
+                user.getDisplayName(), user.getEmail(), user.getRole().name(), user.getTelegramChatId());
     }
 }
