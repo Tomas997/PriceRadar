@@ -31,6 +31,8 @@ class TrackedGroupControllerTest {
 
     private MockMvc mockMvc;
 
+    private static final String USER_EMAIL = "user@example.com";
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
@@ -40,19 +42,21 @@ class TrackedGroupControllerTest {
 
     private TrackedGroupResponse sampleGroup() {
         return new TrackedGroupResponse(
-                1L, "user@example.com", 42999L, LocalDateTime.now(),
+                1L, USER_EMAIL, 42999L, LocalDateTime.now(),
                 List.of(
                         new TrackedItemResponse(1L, "Citrus", "iPhone 15", "https://citrus.ua/1", 42999L),
                         new TrackedItemResponse(2L, "OpenShop", "iPhone 15", "https://openshop.ua/1", 44999L)
-                )
+                ),
+                false
         );
     }
 
     @Test
     void createGroup_returns201_withGroupData() throws Exception {
-        when(groupTrackingService.createGroup(any())).thenReturn(sampleGroup());
+        when(groupTrackingService.createGroup(any(), eq(USER_EMAIL))).thenReturn(sampleGroup());
 
         mockMvc.perform(post("/api/groups")
+                        .header("X-User-Email", USER_EMAIL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -71,13 +75,23 @@ class TrackedGroupControllerTest {
     }
 
     @Test
-    void getGroups_returnsListForUser() throws Exception {
-        when(groupTrackingService.getGroupsByUser("user@example.com")).thenReturn(List.of(sampleGroup()));
+    void createGroup_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(post("/api/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userEmail":"user@example.com","telegramChatId":"123","items":[]}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
 
-        mockMvc.perform(get("/api/groups").param("userEmail", "user@example.com"))
+    @Test
+    void getGroups_returnsListForUser() throws Exception {
+        when(groupTrackingService.getGroupsByUser(USER_EMAIL)).thenReturn(List.of(sampleGroup()));
+
+        mockMvc.perform(get("/api/groups").header("X-User-Email", USER_EMAIL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].userEmail").value("user@example.com"))
+                .andExpect(jsonPath("$[0].userEmail").value(USER_EMAIL))
                 .andExpect(jsonPath("$[0].lastMinPrice").value(42999));
     }
 
@@ -85,48 +99,110 @@ class TrackedGroupControllerTest {
     void getGroups_returnsEmptyList_whenNoGroups() throws Exception {
         when(groupTrackingService.getGroupsByUser("nobody@example.com")).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/groups").param("userEmail", "nobody@example.com"))
+        mockMvc.perform(get("/api/groups").header("X-User-Email", "nobody@example.com"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    void deleteGroup_returns204() throws Exception {
-        doNothing().when(groupTrackingService).deleteGroup(1L);
+    void getGroups_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(get("/api/groups"))
+                .andExpect(status().isBadRequest());
+    }
 
-        mockMvc.perform(delete("/api/groups/1"))
+    @Test
+    void deleteGroup_returns204() throws Exception {
+        doNothing().when(groupTrackingService).deleteGroup(1L, USER_EMAIL);
+
+        mockMvc.perform(delete("/api/groups/1").header("X-User-Email", USER_EMAIL))
                 .andExpect(status().isNoContent());
 
-        verify(groupTrackingService).deleteGroup(1L);
+        verify(groupTrackingService).deleteGroup(1L, USER_EMAIL);
+    }
+
+    @Test
+    void deleteGroup_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(delete("/api/groups/1"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void testNotify_returns204_andCallsService() throws Exception {
-        doNothing().when(groupTrackingService).sendTestNotification(eq(1L), any());
+        doNothing().when(groupTrackingService).sendTestNotification(eq(1L), any(), eq(USER_EMAIL));
 
-        mockMvc.perform(post("/api/groups/1/test-notify").param("chatId", "123456789"))
+        mockMvc.perform(post("/api/groups/1/test-notify")
+                        .header("X-User-Email", USER_EMAIL)
+                        .param("chatId", "123456789"))
                 .andExpect(status().isNoContent());
 
-        verify(groupTrackingService).sendTestNotification(1L, "123456789");
+        verify(groupTrackingService).sendTestNotification(1L, "123456789", USER_EMAIL);
     }
 
     @Test
     void triggerCheck_returns204_andCallsScheduler() throws Exception {
         doNothing().when(priceCheckScheduler).checkPrices();
 
-        mockMvc.perform(post("/api/groups/trigger-check"))
+        mockMvc.perform(post("/api/groups/trigger-check")
+                        .header("X-User-Email", USER_EMAIL))
                 .andExpect(status().isNoContent());
 
         verify(priceCheckScheduler).checkPrices();
     }
 
     @Test
-    void simulatePriceChange_returns204_andCallsService() throws Exception {
-        doNothing().when(groupTrackingService).simulatePriceChange(1L);
+    void triggerCheck_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(post("/api/groups/trigger-check"))
+                .andExpect(status().isBadRequest());
+    }
 
-        mockMvc.perform(post("/api/groups/1/simulate-price-change"))
+    @Test
+    void simulatePriceChange_returns204_andCallsService() throws Exception {
+        doNothing().when(groupTrackingService).simulatePriceChange(1L, USER_EMAIL);
+
+        mockMvc.perform(post("/api/groups/1/simulate-price-change")
+                        .header("X-User-Email", USER_EMAIL))
                 .andExpect(status().isNoContent());
 
-        verify(groupTrackingService).simulatePriceChange(1L);
+        verify(groupTrackingService).simulatePriceChange(1L, USER_EMAIL);
+    }
+
+    @Test
+    void simulatePriceChange_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(post("/api/groups/1/simulate-price-change"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void seedHistory_returns204_andCallsService() throws Exception {
+        doNothing().when(groupTrackingService).seedDemoHistory(1L, USER_EMAIL);
+
+        mockMvc.perform(post("/api/groups/1/seed-history")
+                        .header("X-User-Email", USER_EMAIL))
+                .andExpect(status().isNoContent());
+
+        verify(groupTrackingService).seedDemoHistory(1L, USER_EMAIL);
+    }
+
+    @Test
+    void seedHistory_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(post("/api/groups/1/seed-history"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void clearDemoHistory_returns204_andCallsService() throws Exception {
+        doNothing().when(groupTrackingService).clearDemoHistory(1L, USER_EMAIL);
+
+        mockMvc.perform(delete("/api/groups/1/demo-history")
+                        .header("X-User-Email", USER_EMAIL))
+                .andExpect(status().isNoContent());
+
+        verify(groupTrackingService).clearDemoHistory(1L, USER_EMAIL);
+    }
+
+    @Test
+    void clearDemoHistory_returns400_whenNoAuthHeader() throws Exception {
+        mockMvc.perform(delete("/api/groups/1/demo-history"))
+                .andExpect(status().isBadRequest());
     }
 }

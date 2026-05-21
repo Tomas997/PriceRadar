@@ -46,6 +46,9 @@ public class PriceCheckScheduler {
     @Value("${parser.service.url:http://localhost:8082}")
     private String parserUrl;
 
+    @Value("${internal.api.key:}")
+    private String internalApiKey;
+
     private final RestClient restClient = RestClient.create();
 
     @Scheduled(cron = "${price.check.cron:0 0 10 * * *}")
@@ -139,6 +142,7 @@ public class PriceCheckScheduler {
             URI uri = URI.create(parserUrl + "/api/search?query=" + encoded);
             List<MarketplaceSearchResult> results = restClient.get()
                     .uri(uri)
+                    .header("X-Internal-Key", internalApiKey)
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
             if (results == null) return null;

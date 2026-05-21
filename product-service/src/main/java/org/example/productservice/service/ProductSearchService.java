@@ -9,8 +9,10 @@ import org.example.productservice.model.PriceEntry;
 import org.example.productservice.model.Product;
 import org.example.productservice.repository.PriceEntryRepository;
 import org.example.productservice.repository.ProductRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -23,13 +25,14 @@ public class ProductSearchService {
     private final PriceEntryRepository priceEntryRepository;
 
     @Transactional
-    public Product trackProduct(TrackProductRequest request) {
+    public Product trackProduct(TrackProductRequest request, String userEmail) {
+        String effectiveEmail = (userEmail != null && !userEmail.isBlank()) ? userEmail : request.userEmail();
         Product product = productRepository.save(new Product(
                 request.title(),
                 request.marketplace(),
                 request.url(),
                 request.inStock(),
-                request.userEmail(),
+                effectiveEmail,
                 request.price()
         ));
         priceEntryRepository.save(new PriceEntry(product.getId(), request.price()));
@@ -56,9 +59,11 @@ public class ProductSearchService {
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
-        if (!productRepository.existsById(id)) {
-            throw new ProductNotFoundException(id);
+    public void deleteProduct(Long id, String userEmail) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException(id));
+        if (userEmail != null && !userEmail.isBlank() && !userEmail.equals(product.getUserEmail())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
         priceEntryRepository.deleteByProductId(id);
         productRepository.deleteById(id);

@@ -22,31 +22,38 @@ public class TrackedGroupController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TrackedGroupResponse createGroup(@RequestBody CreateTrackedGroupRequest request) {
-        return groupTrackingService.createGroup(request);
+    public TrackedGroupResponse createGroup(
+            @RequestBody CreateTrackedGroupRequest request,
+            @RequestHeader("X-User-Email") String userEmail) {
+        return groupTrackingService.createGroup(request, userEmail);
     }
 
     @GetMapping
-    public List<TrackedGroupResponse> getGroups(@RequestParam String userEmail) {
+    public List<TrackedGroupResponse> getGroups(
+            @RequestHeader("X-User-Email") String userEmail) {
         return groupTrackingService.getGroupsByUser(userEmail);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteGroup(@PathVariable Long id) {
-        groupTrackingService.deleteGroup(id);
+    public void deleteGroup(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        groupTrackingService.deleteGroup(id, userEmail);
     }
 
     @PostMapping("/{id}/test-notify")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void testNotify(@PathVariable Long id,
-                           @RequestParam(required = false) String chatId) {
-        groupTrackingService.sendTestNotification(id, chatId);
+    public void testNotify(
+            @PathVariable Long id,
+            @RequestParam(required = false) String chatId,
+            @RequestHeader("X-User-Email") String userEmail) {
+        groupTrackingService.sendTestNotification(id, chatId, userEmail);
     }
 
     @PostMapping("/trigger-check")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void triggerCheck() {
+    public void triggerCheck(@RequestHeader("X-User-Email") String userEmail) {
         priceCheckScheduler.checkPrices();
     }
 
@@ -57,30 +64,41 @@ public class TrackedGroupController {
 
     @PostMapping("/{id}/check-prices")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void checkGroupPrices(@PathVariable Long id) {
+    public void checkGroupPrices(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        groupTrackingService.verifyGroupOwnership(id, userEmail);
         priceCheckScheduler.checkGroup(id);
     }
 
     @GetMapping("/{id}/history")
-    public GroupPriceHistoryResponse getHistory(@PathVariable Long id) {
-        return groupTrackingService.getGroupHistory(id);
+    public GroupPriceHistoryResponse getHistory(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        return groupTrackingService.getGroupHistory(id, userEmail);
     }
 
     @PostMapping("/{id}/seed-history")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void seedHistory(@PathVariable Long id) {
-        groupTrackingService.seedDemoHistory(id);
+    public void seedHistory(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        groupTrackingService.seedDemoHistory(id, userEmail);
     }
 
     @DeleteMapping("/{id}/demo-history")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void clearDemoHistory(@PathVariable Long id) {
-        groupTrackingService.clearDemoHistory(id);
+    public void clearDemoHistory(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        groupTrackingService.clearDemoHistory(id, userEmail);
     }
 
     @PostMapping("/{id}/simulate-price-change")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void simulatePriceChange(@PathVariable Long id) {
-        groupTrackingService.simulatePriceChange(id);
+    public void simulatePriceChange(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        groupTrackingService.simulatePriceChange(id, userEmail);
     }
 }

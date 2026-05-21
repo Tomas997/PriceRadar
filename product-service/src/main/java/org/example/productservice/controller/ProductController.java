@@ -20,11 +20,16 @@ public class ProductController {
     private final ProductSearchService productSearchService;
 
     @GetMapping
-    public List<ProductResponse> getAll(@RequestParam(required = false) String userEmail) {
-        List<Product> products = userEmail != null
-                ? productSearchService.getProductsByUser(userEmail)
-                : productSearchService.getAllTrackedProducts();
-        return products.stream().map(ProductResponse::from).toList();
+    public List<ProductResponse> getAll(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        if (userEmail == null || userEmail.isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return productSearchService.getProductsByUser(userEmail)
+                .stream()
+                .map(ProductResponse::from)
+                .toList();
     }
 
     @GetMapping("/search")
@@ -42,8 +47,10 @@ public class ProductController {
 
     @PostMapping("/track")
     @ResponseStatus(HttpStatus.CREATED)
-    public ProductResponse track(@Valid @RequestBody TrackProductRequest request) {
-        return ProductResponse.from(productSearchService.trackProduct(request));
+    public ProductResponse track(
+            @Valid @RequestBody TrackProductRequest request,
+            @RequestHeader("X-User-Email") String userEmail) {
+        return ProductResponse.from(productSearchService.trackProduct(request, userEmail));
     }
 
     @GetMapping("/{id}/history")
@@ -56,7 +63,9 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        productSearchService.deleteProduct(id);
+    public void delete(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String userEmail) {
+        productSearchService.deleteProduct(id, userEmail);
     }
 }

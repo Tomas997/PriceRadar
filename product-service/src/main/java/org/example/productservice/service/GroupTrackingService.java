@@ -14,8 +14,10 @@ import org.example.productservice.model.TrackedItem;
 import org.example.productservice.repository.CatalogItemRepository;
 import org.example.productservice.repository.GroupPriceEntryRepository;
 import org.example.productservice.repository.TrackedGroupRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -36,9 +38,9 @@ public class GroupTrackingService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @Transactional
-    public TrackedGroupResponse createGroup(CreateTrackedGroupRequest req) {
+    public TrackedGroupResponse createGroup(CreateTrackedGroupRequest req, String userEmail) {
         TrackedGroup group = new TrackedGroup();
-        group.setUserEmail(req.userEmail());
+        group.setUserEmail(userEmail != null && !userEmail.isBlank() ? userEmail : req.userEmail());
         group.setTelegramChatId(req.telegramChatId());
         group.setCreatedAt(LocalDateTime.now());
 
@@ -96,24 +98,44 @@ public class GroupTrackingService {
     }
 
     @Transactional
-    public void deleteGroup(Long groupId) {
+    public void deleteGroup(Long groupId, String userEmail) {
+        TrackedGroup group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
         groupRepo.deleteById(groupId);
         log.info("Deleted tracked group id={}", groupId);
     }
 
-    @Transactional
-    public void simulatePriceChange(Long groupId) {
-        groupRepo.findById(groupId).ifPresent(group -> {
-            group.setLastMinPrice(1L);
-            groupRepo.save(group);
-            log.info("Simulated price change for group id={}: lastMinPrice set to 1", groupId);
-        });
+    public void verifyGroupOwnership(Long groupId, String userEmail) {
+        TrackedGroup group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
+    }
+
+    private void verifyOwnership(TrackedGroup group, String userEmail) {
+        if (userEmail == null || userEmail.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        if (!userEmail.equals(group.getUserEmail())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
     }
 
     @Transactional
-    public void seedDemoHistory(Long groupId) {
+    public void simulatePriceChange(Long groupId, String userEmail) {
         TrackedGroup group = groupRepo.findById(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("Group not found: " + groupId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
+        group.setLastMinPrice(1L);
+        groupRepo.save(group);
+        log.info("Simulated price change for group id={}: lastMinPrice set to 1", groupId);
+    }
+
+    @Transactional
+    public void seedDemoHistory(Long groupId, String userEmail) {
+        TrackedGroup group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
 
         List<Long> catalogItemIds = group.getItems().stream()
                 .map(item -> item.getCatalogItem().getId()).toList();
@@ -140,18 +162,20 @@ public class GroupTrackingService {
     }
 
     @Transactional
-    public void clearDemoHistory(Long groupId) {
+    public void clearDemoHistory(Long groupId, String userEmail) {
         TrackedGroup group = groupRepo.findById(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("Group not found: " + groupId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
         List<Long> catalogItemIds = group.getItems().stream()
                 .map(item -> item.getCatalogItem().getId()).toList();
         priceEntryRepo.deleteByCatalogItemIdInAndDemoTrue(catalogItemIds);
         log.info("Cleared demo history for group id={}", groupId);
     }
 
-    public GroupPriceHistoryResponse getGroupHistory(Long groupId) {
+    public GroupPriceHistoryResponse getGroupHistory(Long groupId, String userEmail) {
         TrackedGroup group = groupRepo.findById(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("Group not found: " + groupId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
 
         List<Long> catalogItemIds = group.getItems().stream()
                 .map(item -> item.getCatalogItem().getId()).toList();
@@ -175,8 +199,9 @@ public class GroupTrackingService {
         return new GroupPriceHistoryResponse(groupId, hasDemo, series);
     }
 
-    public void sendTestNotification(Long groupId, String overrideChatId) {
+    public void sendTestNotification(Long groupId, String overrideChatId, String userEmail) {
         groupRepo.findById(groupId).ifPresent(group -> {
+            verifyOwnership(group, userEmail);
             String chatId = (overrideChatId != null && !overrideChatId.isBlank())
                     ? overrideChatId
                     : group.getTelegramChatId();
