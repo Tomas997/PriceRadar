@@ -26,6 +26,7 @@ public class AuthService implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final LoginRateLimiter loginRateLimiter;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
@@ -47,9 +48,10 @@ public class AuthService implements UserDetailsService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        loginRateLimiter.checkNotBlocked(request.email());
+        User user = userRepository.findByEmail(request.email()).orElse(null);
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+            loginRateLimiter.recordFailure(request.email());
             throw new BadCredentialsException("Invalid credentials");
         }
         log.info("User logged in email={}", user.getEmail());

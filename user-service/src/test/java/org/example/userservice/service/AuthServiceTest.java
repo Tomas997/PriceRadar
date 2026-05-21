@@ -12,8 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -28,6 +30,7 @@ class AuthServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
+    @Mock private LoginRateLimiter loginRateLimiter;
     @InjectMocks private AuthService authService;
 
     private User sampleUser() {
@@ -118,6 +121,49 @@ class AuthServiceTest {
                 .isInstanceOf(BadCredentialsException.class);
         assertThatThrownBy(() -> authService.login(new LoginRequest("alice@example.com", "wrongpassword")))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void login_throwsTooManyRequests_whenRateLimitExceeded() {
+        doThrow(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many failed login attempts"))
+                .when(loginRateLimiter).checkNotBlocked("alice@example.com");
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("alice@example.com", "password")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    @Test
+    void login_recordsFailure_whenUserNotFound() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("unknown@example.com", "password")))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(loginRateLimiter).recordFailure("unknown@example.com");
+    }
+
+    @Test
+    void login_recordsFailure_whenPasswordWrong() {
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(sampleUser()));
+        when(passwordEncoder.matches("wrongpassword", "hashed")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("alice@example.com", "wrongpassword")))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(loginRateLimiter).recordFailure("alice@example.com");
+    }
+
+    @Test
+    void login_doesNotRecordFailure_whenCredentialsValid() {
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(sampleUser()));
+        when(passwordEncoder.matches("password123", "hashed")).thenReturn(true);
+        when(jwtService.generateToken(any(), any())).thenReturn("token");
+
+        authService.login(new LoginRequest("alice@example.com", "password123"));
+
+        verify(loginRateLimiter, never()).recordFailure(any());
     }
 
     @Test
