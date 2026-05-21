@@ -12,15 +12,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,7 +33,7 @@ class AuthControllerTest {
     private MockMvc mockMvc;
 
     private static final AuthResponse SAMPLE_RESPONSE =
-            new AuthResponse("jwt-token", "Alice", "alice@example.com", "USER", null);
+            new AuthResponse("access-token", "refresh-uuid", "Alice", "alice@example.com", "USER", null);
 
     @BeforeEach
     void setUp() {
@@ -42,8 +43,10 @@ class AuthControllerTest {
                 .build();
     }
 
+    // ─── register ───────────────────────────────────────────────────────────
+
     @Test
-    void register_returns201_withToken() throws Exception {
+    void register_returns201_withBothTokens() throws Exception {
         when(authService.register(any())).thenReturn(SAMPLE_RESPONSE);
 
         mockMvc.perform(post("/api/auth/register")
@@ -52,7 +55,8 @@ class AuthControllerTest {
                                 {"username":"Alice","email":"alice@example.com","password":"password123"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").value("jwt-token"))
+                .andExpect(jsonPath("$.token").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-uuid"))
                 .andExpect(jsonPath("$.email").value("alice@example.com"))
                 .andExpect(jsonPath("$.role").value("USER"));
     }
@@ -103,8 +107,10 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.password").exists());
     }
 
+    // ─── login ──────────────────────────────────────────────────────────────
+
     @Test
-    void login_returns200_withToken() throws Exception {
+    void login_returns200_withBothTokens() throws Exception {
         when(authService.login(any())).thenReturn(SAMPLE_RESPONSE);
 
         mockMvc.perform(post("/api/auth/login")
@@ -113,7 +119,8 @@ class AuthControllerTest {
                                 {"email":"alice@example.com","password":"password123"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token"))
+                .andExpect(jsonPath("$.token").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-uuid"))
                 .andExpect(jsonPath("$.username").value("Alice"));
     }
 
@@ -129,6 +136,95 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Invalid credentials"));
     }
+
+    @Test
+    void login_returns429_whenRateLimitExceeded() throws Exception {
+        when(authService.login(any())).thenThrow(
+                new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many failed login attempts"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"alice@example.com","password":"wrong"}
+                                """))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    // ─── refresh ────────────────────────────────────────────────────────────
+
+    @Test
+    void refresh_returns200_withNewTokens() throws Exception {
+        AuthResponse refreshed = new AuthResponse("new-access", "new-refresh",
+                "Alice", "alice@example.com", "USER", null);
+        when(authService.refresh("old-refresh")).thenReturn(refreshed);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"old-refresh"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("new-access"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh"));
+    }
+
+    @Test
+    void refresh_returns401_whenRefreshTokenInvalid() throws Exception {
+        when(authService.refresh("bad-token"))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"bad-token"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Invalid refresh token"));
+    }
+
+    @Test
+    void refresh_returns401_whenRefreshTokenExpired() throws Exception {
+        when(authService.refresh("expired-token"))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"expired-token"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Refresh token expired"));
+    }
+
+    // ─── logout ─────────────────────────────────────────────────────────────
+
+    @Test
+    void logout_returns204_andRevokesToken() throws Exception {
+        doNothing().when(authService).logout("some-refresh");
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"some-refresh"}
+                                """))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("some-refresh");
+    }
+
+    @Test
+    void logout_returns204_evenWhenTokenDoesNotExist() throws Exception {
+        doNothing().when(authService).logout(any());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"unknown-token"}
+                                """))
+                .andExpect(status().isNoContent());
+    }
+
+    // ─── me ─────────────────────────────────────────────────────────────────
 
     @Test
     void me_returnsUserInfo_whenAuthenticated() throws Exception {

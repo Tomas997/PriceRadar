@@ -1,5 +1,6 @@
 package org.example.userservice.security;
 
+import com.jayway.jsonpath.JsonPath;
 import org.example.userservice.service.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class SecurityIntegrationTest {
                 .content("""
                         {"username":"TestUser","email":"test@example.com","password":"password123"}
                         """));
-        validToken = jwtService.generateToken("test@example.com", "USER");
+        validToken = jwtService.generateAccessToken("test@example.com", "USER");
     }
 
     // ─── Захист ендпоінтів без токена ───────────────────────────────────────
@@ -297,5 +298,127 @@ class SecurityIntegrationTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").exists());
+    }
+
+    // ─── Refresh token ───────────────────────────────────────────────────────
+
+    @Test
+    void refresh_isPublicEndpoint_noAuthRequired() throws Exception {
+        // Повинен пройти через Spring Security (не 401 від security),
+        // але повернути 401 від сервісу — бо refreshToken невалідний
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"invalid-token"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
+    void refresh_returnsNewAccessAndRefreshTokens_whenValid() throws Exception {
+        String loginBody = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"test@example.com","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").exists())
+                .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.email").value("test@example.com"));
+    }
+
+    @Test
+    void refresh_rotatesToken_oldTokenBecomesInvalid() throws Exception {
+        String loginBody = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"test@example.com","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String oldRefreshToken = JsonPath.read(loginBody, "$.refreshToken");
+
+        // Використовуємо старий refresh token
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + oldRefreshToken + "\"}"))
+                .andExpect(status().isOk());
+
+        // Повторне використання вже спожитого токена → 401
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + oldRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ─── Logout ──────────────────────────────────────────────────────────────
+
+    @Test
+    void logout_isPublicEndpoint_noAuthRequired() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"nonexistent-token"}
+                                """))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void logout_revokesRefreshToken_subsequentRefreshFails() throws Exception {
+        String loginBody = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"test@example.com","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
+
+        // Logout відкликає refresh token
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // Після logout refresh token вже не працює
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logout_doesNotInvalidateAccessToken_itExpiresNaturally() throws Exception {
+        String loginBody = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"test@example.com","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String accessToken = JsonPath.read(loginBody, "$.token");
+        String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // Access token залишається валідним до свого закінчення
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
     }
 }

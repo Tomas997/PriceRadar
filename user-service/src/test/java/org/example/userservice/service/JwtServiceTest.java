@@ -14,34 +14,33 @@ class JwtServiceTest {
     void setUp() {
         jwtService = new JwtService();
         ReflectionTestUtils.setField(jwtService, "secret", "test-secret-key-that-is-long-enough-for-hmac");
-        ReflectionTestUtils.setField(jwtService, "expirationMs", 3600000L);
+        ReflectionTestUtils.setField(jwtService, "accessExpirationMs", 3600000L);
     }
 
     @Test
-    void generateToken_returnsThreePartJwt() {
-        String token = jwtService.generateToken("user@example.com", "USER");
+    void generateAccessToken_returnsThreePartJwt() {
+        String token = jwtService.generateAccessToken("user@example.com", "USER");
 
-        String[] parts = token.split("\\.");
-        assertThat(parts).hasSize(3);
+        assertThat(token.split("\\.")).hasSize(3);
     }
 
     @Test
     void extractEmail_returnsCorrectEmail() {
-        String token = jwtService.generateToken("user@example.com", "USER");
+        String token = jwtService.generateAccessToken("user@example.com", "USER");
 
         assertThat(jwtService.extractEmail(token)).isEqualTo("user@example.com");
     }
 
     @Test
     void isValid_returnsTrueForFreshToken() {
-        String token = jwtService.generateToken("user@example.com", "USER");
+        String token = jwtService.generateAccessToken("user@example.com", "USER");
 
         assertThat(jwtService.isValid(token)).isTrue();
     }
 
     @Test
     void isValid_returnsFalseForTamperedSignature() {
-        String token = jwtService.generateToken("user@example.com", "USER");
+        String token = jwtService.generateAccessToken("user@example.com", "USER");
         String tampered = token.substring(0, token.lastIndexOf('.')) + ".invalidsig";
 
         assertThat(jwtService.isValid(tampered)).isFalse();
@@ -51,9 +50,9 @@ class JwtServiceTest {
     void isValid_returnsFalseForExpiredToken() {
         JwtService shortLivedService = new JwtService();
         ReflectionTestUtils.setField(shortLivedService, "secret", "test-secret-key-that-is-long-enough-for-hmac");
-        ReflectionTestUtils.setField(shortLivedService, "expirationMs", -1000L);
+        ReflectionTestUtils.setField(shortLivedService, "accessExpirationMs", -1000L);
 
-        String token = shortLivedService.generateToken("user@example.com", "USER");
+        String token = shortLivedService.generateAccessToken("user@example.com", "USER");
 
         assertThat(shortLivedService.isValid(token)).isFalse();
     }
@@ -66,9 +65,9 @@ class JwtServiceTest {
     }
 
     @Test
-    void generateToken_differentEmailsProduceDifferentTokens() {
-        String token1 = jwtService.generateToken("alice@example.com", "USER");
-        String token2 = jwtService.generateToken("bob@example.com", "USER");
+    void generateAccessToken_differentEmailsProduceDifferentTokens() {
+        String token1 = jwtService.generateAccessToken("alice@example.com", "USER");
+        String token2 = jwtService.generateAccessToken("bob@example.com", "USER");
 
         assertThat(token1).isNotEqualTo(token2);
     }
