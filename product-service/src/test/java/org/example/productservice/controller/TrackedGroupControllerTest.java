@@ -47,7 +47,7 @@ class TrackedGroupControllerTest {
                         new TrackedItemResponse(1L, "Citrus", "iPhone 15", "https://citrus.ua/1", 42999L),
                         new TrackedItemResponse(2L, "OpenShop", "iPhone 15", "https://openshop.ua/1", 44999L)
                 ),
-                false
+                false, false
         );
     }
 

@@ -8,7 +8,8 @@ public record TrackedGroupResponse(
         Long lastMinPrice,
         String createdAt,
         List<TrackedItemResponse> items,
-        boolean hasStaleItems
+        boolean hasStaleItems,
+        boolean telegramBlocked
 ) {
     public TrackedItemResponse minPriceItem() {
         if (items == null || items.isEmpty()) return null;

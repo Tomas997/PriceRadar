@@ -11,7 +11,8 @@ public record TrackedGroupResponse(
         Long lastMinPrice,
         LocalDateTime createdAt,
         List<TrackedItemResponse> items,
-        boolean hasStaleItems
+        boolean hasStaleItems,
+        boolean telegramBlocked
 ) {
     public static TrackedGroupResponse from(TrackedGroup group, boolean hasStaleItems) {
         List<TrackedItemResponse> items = group.getItems().stream()
@@ -23,7 +24,8 @@ public record TrackedGroupResponse(
                 group.getLastMinPrice(),
                 group.getCreatedAt(),
                 items,
-                hasStaleItems
+                hasStaleItems,
+                group.isTelegramBlocked()
         );
     }
 }

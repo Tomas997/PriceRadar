@@ -23,6 +23,9 @@ public class TrackedGroup {
     private Long lastMinPrice;
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
+    private boolean telegramBlocked = false;
+
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<TrackedItem> items = new ArrayList<>();
 }

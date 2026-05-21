@@ -56,7 +56,7 @@ public class PriceCheckScheduler {
     public void checkPrices() {
         log.info("Daily price check started");
 
-        for (CatalogItem item : catalogItemRepo.findAll()) {
+        for (CatalogItem item : catalogItemRepo.findActiveItems()) {
             try {
                 Long fresh = fetchPrice(item);
                 if (fresh != null) {
@@ -71,6 +71,10 @@ public class PriceCheckScheduler {
         }
 
         for (TrackedGroup group : groupRepo.findAll()) {
+            if (group.isTelegramBlocked()) {
+                log.debug("Skipping blocked group id={} userEmail={}", group.getId(), group.getUserEmail());
+                continue;
+            }
             try {
                 recalculateGroupMin(group);
             } catch (Exception e) {
@@ -131,7 +135,15 @@ public class PriceCheckScheduler {
         if (!newMin.equals(oldMin)) {
             group.setLastMinPrice(newMin);
             groupRepo.save(group);
-            telegramService.send(group.getTelegramChatId(), buildMessage(group, newMin, oldMin));
+            if (!group.isTelegramBlocked()) {
+                TelegramSendResult result = telegramService.send(
+                        group.getTelegramChatId(), buildMessage(group, newMin, oldMin));
+                if (result == TelegramSendResult.USER_BLOCKED_BOT) {
+                    group.setTelegramBlocked(true);
+                    groupRepo.save(group);
+                    log.info("Group id={} marked telegram-blocked: user blocked the bot", group.getId());
+                }
+            }
             log.info("Group id={} min price changed {} -> {}", group.getId(), oldMin, newMin);
         }
     }

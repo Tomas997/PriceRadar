@@ -199,27 +199,43 @@ public class GroupTrackingService {
         return new GroupPriceHistoryResponse(groupId, hasDemo, series);
     }
 
+    @Transactional
     public void sendTestNotification(Long groupId, String overrideChatId, String userEmail) {
-        groupRepo.findById(groupId).ifPresent(group -> {
-            verifyOwnership(group, userEmail);
-            String chatId = (overrideChatId != null && !overrideChatId.isBlank())
-                    ? overrideChatId
-                    : group.getTelegramChatId();
-            var sb = new StringBuilder();
-            sb.append("🔔 <b>Тест PriceRadar — сповіщення працює!</b>\n\n");
-            sb.append("Мінімальна ціна у групі: <b>")
-              .append(group.getLastMinPrice() != null ? group.getLastMinPrice() + " грн" : "N/A")
-              .append("</b>\n\n");
-            sb.append("Товари:\n");
-            for (TrackedItem item : group.getItems()) {
-                CatalogItem ci = item.getCatalogItem();
-                sb.append("• <b>[").append(ci.getMarketplace()).append("]</b> ")
-                  .append(ci.getTitle())
-                  .append(" — ").append(ci.getCurrentPrice() != null ? ci.getCurrentPrice() + " грн" : "N/A")
-                  .append("\n  <a href=\"").append(ci.getUrl()).append("\">Переглянути</a>\n");
-            }
-            telegramService.send(chatId, sb.toString());
-            log.info("Sent test notification for group id={} to chatId={}", groupId, chatId);
-        });
+        TrackedGroup group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        verifyOwnership(group, userEmail);
+
+        String chatId = (overrideChatId != null && !overrideChatId.isBlank())
+                ? overrideChatId
+                : group.getTelegramChatId();
+
+        var sb = new StringBuilder();
+        sb.append("🔔 <b>Тест PriceRadar — сповіщення працює!</b>\n\n");
+        sb.append("Мінімальна ціна у групі: <b>")
+          .append(group.getLastMinPrice() != null ? group.getLastMinPrice() + " грн" : "N/A")
+          .append("</b>\n\n");
+        sb.append("Товари:\n");
+        for (TrackedItem item : group.getItems()) {
+            CatalogItem ci = item.getCatalogItem();
+            sb.append("• <b>[").append(ci.getMarketplace()).append("]</b> ")
+              .append(ci.getTitle())
+              .append(" — ").append(ci.getCurrentPrice() != null ? ci.getCurrentPrice() + " грн" : "N/A")
+              .append("\n  <a href=\"").append(ci.getUrl()).append("\">Переглянути</a>\n");
+        }
+
+        TelegramSendResult result = telegramService.send(chatId, sb.toString());
+        if (result == TelegramSendResult.USER_BLOCKED_BOT) {
+            group.setTelegramBlocked(true);
+            groupRepo.save(group);
+            log.warn("Test notification failed for group id={}: user blocked the bot", groupId);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Bot was blocked by the user in Telegram. Unblock the bot and try again.");
+        }
+        if (result == TelegramSendResult.OK && group.isTelegramBlocked()) {
+            group.setTelegramBlocked(false);
+            groupRepo.save(group);
+            log.info("Group id={} telegram-block cleared after successful test notification", groupId);
+        }
+        log.info("Sent test notification for group id={} to chatId={}", groupId, chatId);
     }
 }
