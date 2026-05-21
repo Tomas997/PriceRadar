@@ -1,5 +1,6 @@
 package org.example.frontendservice.client;
 
+import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.example.frontendservice.dto.AuthResponse;
 import org.example.frontendservice.dto.CheckConfigResponse;
@@ -7,6 +8,7 @@ import org.example.frontendservice.dto.GroupPriceHistoryResponse;
 import org.example.frontendservice.dto.MarketplaceSearchResult;
 import org.example.frontendservice.dto.TrackedGroupResponse;
 import org.example.frontendservice.dto.UserResponse;
+import org.example.frontendservice.exception.SessionExpiredException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
@@ -21,6 +23,8 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 @Slf4j
 @Component
@@ -63,6 +67,55 @@ public class GatewayClient {
                 .body(body)
                 .retrieve()
                 .body(AuthResponse.class);
+    }
+
+    public AuthResponse refreshTokens(String refreshToken) {
+        return restClient.post()
+                .uri("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("refreshToken", refreshToken))
+                .retrieve()
+                .body(AuthResponse.class);
+    }
+
+    public void logout(String refreshToken) {
+        try {
+            restClient.post()
+                    .uri("/api/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("refreshToken", refreshToken))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.warn("Logout request failed (token already revoked or service unavailable): {}", e.getMessage());
+        }
+    }
+
+    public <T> T withAutoRefresh(HttpSession session, Function<String, T> call) {
+        String token = (String) session.getAttribute("token");
+        try {
+            return call.apply(token);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 401) {
+                String refreshToken = (String) session.getAttribute("refreshToken");
+                if (refreshToken != null) {
+                    try {
+                        AuthResponse refreshed = refreshTokens(refreshToken);
+                        session.setAttribute("token", refreshed.token());
+                        session.setAttribute("refreshToken", refreshed.refreshToken());
+                        return call.apply(refreshed.token());
+                    } catch (Exception re) {
+                        throw new SessionExpiredException();
+                    }
+                }
+                throw new SessionExpiredException();
+            }
+            throw e;
+        }
+    }
+
+    public void runWithAutoRefresh(HttpSession session, Consumer<String> action) {
+        withAutoRefresh(session, token -> { action.accept(token); return null; });
     }
 
     public UserResponse getMe(String token) {

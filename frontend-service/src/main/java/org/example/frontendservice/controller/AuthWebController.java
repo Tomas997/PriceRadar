@@ -37,6 +37,7 @@ public class AuthWebController {
         try {
             AuthResponse resp = gatewayClient.login(email, password);
             session.setAttribute("token", resp.token());
+            session.setAttribute("refreshToken", resp.refreshToken());
             session.setAttribute("userEmail", resp.email());
             session.setAttribute("username", resp.username());
             session.setAttribute("telegramChatId", resp.telegramChatId());
@@ -69,6 +70,7 @@ public class AuthWebController {
         try {
             AuthResponse resp = gatewayClient.register(username, email, password, telegramChatId);
             session.setAttribute("token", resp.token());
+            session.setAttribute("refreshToken", resp.refreshToken());
             session.setAttribute("userEmail", resp.email());
             session.setAttribute("username", resp.username());
             session.setAttribute("telegramChatId", resp.telegramChatId());
@@ -85,6 +87,10 @@ public class AuthWebController {
 
     @GetMapping("/logout")
     public String logout(HttpSession session) {
+        String refreshToken = (String) session.getAttribute("refreshToken");
+        if (refreshToken != null) {
+            gatewayClient.logout(refreshToken);
+        }
         session.invalidate();
         return "redirect:/login";
     }

@@ -19,10 +19,9 @@ public class ProfileController {
 
     @GetMapping("/profile")
     public String profile(HttpSession session, Model model) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
-        UserResponse user = gatewayClient.getMe(token);
+        UserResponse user = gatewayClient.withAutoRefresh(session, gatewayClient::getMe);
         model.addAttribute("user", user);
         model.addAttribute("username", session.getAttribute("username"));
         return "profile";
@@ -31,10 +30,10 @@ public class ProfileController {
     @PostMapping("/profile")
     public String updateProfile(@RequestParam(required = false) String telegramChatId,
                                 HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
-        UserResponse updated = gatewayClient.updateProfile(token, telegramChatId);
+        UserResponse updated = gatewayClient.withAutoRefresh(session,
+                token -> gatewayClient.updateProfile(token, telegramChatId));
         session.setAttribute("telegramChatId", updated.telegramChatId());
         ra.addFlashAttribute("success", "Profile updated");
         return "redirect:/profile";

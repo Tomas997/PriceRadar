@@ -31,20 +31,20 @@ public class TrackedController {
 
     @GetMapping("/tracked")
     public String tracked(HttpSession session, Model model) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         String userEmail = (String) session.getAttribute("userEmail");
         model.addAttribute("username", session.getAttribute("username"));
         try {
-            model.addAttribute("groups", gatewayClient.getTrackedGroups(token, userEmail));
+            model.addAttribute("groups", gatewayClient.withAutoRefresh(session,
+                    token -> gatewayClient.getTrackedGroups(token, userEmail)));
         } catch (Exception e) {
             log.error("Failed to load tracked groups: {}", e.getMessage());
             model.addAttribute("error", "Не вдалося завантажити групи. Спробуйте пізніше.");
             model.addAttribute("groups", java.util.Collections.emptyList());
         }
         try {
-            var cfg = gatewayClient.getCheckConfig(token);
+            var cfg = gatewayClient.withAutoRefresh(session, gatewayClient::getCheckConfig);
             model.addAttribute("showCheckButton", cfg.buttonVisible());
             model.addAttribute("checkHour", cfg.checkHour());
         } catch (Exception e) {
@@ -59,8 +59,7 @@ public class TrackedController {
     public String trackGroup(HttpServletRequest request,
                              @RequestParam(required = false) String query,
                              HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         String userEmail = (String) session.getAttribute("userEmail");
         String telegramChatId = (String) session.getAttribute("telegramChatId");
@@ -80,7 +79,8 @@ public class TrackedController {
         }
 
         try {
-            gatewayClient.createTrackedGroup(token, userEmail, telegramChatId, items);
+            gatewayClient.runWithAutoRefresh(session,
+                    token -> gatewayClient.createTrackedGroup(token, userEmail, telegramChatId, items));
             ra.addFlashAttribute("success", "Групу товарів додано до відстеження!");
         } catch (RestClientResponseException e) {
             log.warn("Create group failed: {}", e.getMessage());
@@ -91,11 +91,11 @@ public class TrackedController {
 
     @PostMapping("/tracked/delete-group")
     public String deleteGroup(@RequestParam Long groupId, HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         try {
-            gatewayClient.deleteTrackedGroup(token, groupId);
+            gatewayClient.runWithAutoRefresh(session,
+                    token -> gatewayClient.deleteTrackedGroup(token, groupId));
             ra.addFlashAttribute("success", "Групу видалено");
         } catch (RestClientResponseException e) {
             ra.addFlashAttribute("error", "Не вдалося видалити групу");
@@ -105,8 +105,7 @@ public class TrackedController {
 
     @PostMapping("/tracked/test-notify/{groupId}")
     public String testNotify(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         String telegramChatId = (String) session.getAttribute("telegramChatId");
         if (telegramChatId == null || telegramChatId.isBlank()) {
@@ -115,7 +114,8 @@ public class TrackedController {
         }
 
         try {
-            gatewayClient.testNotify(token, groupId, telegramChatId);
+            gatewayClient.runWithAutoRefresh(session,
+                    token -> gatewayClient.testNotify(token, groupId, telegramChatId));
             ra.addFlashAttribute("success", "Тестове сповіщення надіслано у Telegram");
         } catch (RestClientResponseException e) {
             log.warn("Test notify failed: {}", e.getMessage());
@@ -126,11 +126,10 @@ public class TrackedController {
 
     @PostMapping("/tracked/trigger-check")
     public String triggerCheck(HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         try {
-            gatewayClient.triggerCheck(token);
+            gatewayClient.runWithAutoRefresh(session, gatewayClient::triggerCheck);
             ra.addFlashAttribute("success", "Перевірку цін запущено. Сповіщення надійде якщо ціна змінилась");
         } catch (RestClientResponseException e) {
             ra.addFlashAttribute("error", "Помилка при запуску перевірки");
@@ -140,11 +139,11 @@ public class TrackedController {
 
     @PostMapping("/tracked/check-group/{groupId}")
     public String checkGroupPrices(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         try {
-            gatewayClient.checkGroupPrices(token, groupId);
+            gatewayClient.runWithAutoRefresh(session,
+                    token -> gatewayClient.checkGroupPrices(token, groupId));
             ra.addFlashAttribute("success", "Ціни перевірено. Сповіщення надійде якщо мінімальна ціна змінилась");
         } catch (RestClientResponseException e) {
             log.warn("Check group prices failed: {}", e.getMessage());
@@ -155,10 +154,10 @@ public class TrackedController {
 
     @PostMapping("/trends/{groupId}/seed")
     public String seedHistory(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
         try {
-            gatewayClient.seedDemoHistory(token, groupId);
+            gatewayClient.runWithAutoRefresh(session,
+                    token -> gatewayClient.seedDemoHistory(token, groupId));
             ra.addFlashAttribute("success", "Тестові дані за 7 днів згенеровано");
         } catch (Exception e) {
             log.error("Seed history failed for group {}: {}", groupId, e.getMessage());
@@ -169,10 +168,10 @@ public class TrackedController {
 
     @PostMapping("/trends/{groupId}/clear-demo")
     public String clearDemoHistory(@PathVariable Long groupId, HttpSession session, RedirectAttributes ra) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
         try {
-            gatewayClient.clearDemoHistory(token, groupId);
+            gatewayClient.runWithAutoRefresh(session,
+                    token -> gatewayClient.clearDemoHistory(token, groupId));
             ra.addFlashAttribute("success", "Тестові дані видалено");
         } catch (Exception e) {
             log.error("Clear demo history failed for group {}: {}", groupId, e.getMessage());
@@ -183,14 +182,14 @@ public class TrackedController {
 
     @GetMapping("/trends/{groupId}")
     public String trends(@PathVariable Long groupId, HttpSession session, Model model) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) return "redirect:/login";
+        if (session.getAttribute("token") == null) return "redirect:/login";
 
         model.addAttribute("username", session.getAttribute("username"));
         model.addAttribute("groupId", groupId);
 
         try {
-            GroupPriceHistoryResponse history = gatewayClient.getGroupHistory(token, groupId);
+            GroupPriceHistoryResponse history = gatewayClient.withAutoRefresh(session,
+                    token -> gatewayClient.getGroupHistory(token, groupId));
             model.addAttribute("series", history.series());
             model.addAttribute("historyJson", objectMapper.writeValueAsString(history.series()));
             boolean fewPoints = history.series().stream()
