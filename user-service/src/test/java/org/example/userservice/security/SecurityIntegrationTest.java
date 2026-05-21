@@ -14,6 +14,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Base64;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -223,6 +224,29 @@ class SecurityIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(body)
                 .doesNotContain("password")
                 .doesNotContain("$2a$");
+    }
+
+    // ─── H2 Console захист ──────────────────────────────────────────────────
+
+    @Test
+    void h2Console_isNotAccessible_withoutAuth() throws Exception {
+        mockMvc.perform(get("/h2-console/"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void h2Console_isNotAccessible_withValidToken() throws Exception {
+        // H2 console is disabled — even authenticated users cannot access it
+        mockMvc.perform(get("/h2-console/")
+                        .header("Authorization", "Bearer " + validToken))
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .isNotEqualTo(200));
+    }
+
+    @Test
+    void h2ConsoleLogin_isNotAccessible_withoutAuth() throws Exception {
+        mockMvc.perform(get("/h2-console/login.jsp"))
+                .andExpect(status().isUnauthorized());
     }
 
     // ─── Валідація вхідних даних ─────────────────────────────────────────────
