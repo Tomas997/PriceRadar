@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.URI;
 import java.util.Map;
 
 @Slf4j
@@ -16,7 +17,15 @@ public class TelegramNotificationService {
     @Value("${telegram.bot.token:}")
     private String botToken;
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
+
+    public TelegramNotificationService() {
+        this.restClient = RestClient.create();
+    }
+
+    TelegramNotificationService(RestClient restClient) {
+        this.restClient = restClient;
+    }
 
     public TelegramSendResult send(String chatId, String text) {
         if (botToken.isBlank()) {
@@ -29,7 +38,7 @@ public class TelegramNotificationService {
         }
         try {
             restClient.post()
-                    .uri("https://api.telegram.org/bot" + botToken + "/sendMessage")
+                    .uri(URI.create("https://api.telegram.org/bot" + botToken + "/sendMessage"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("chat_id", chatId, "text", text, "parse_mode", "HTML"))
                     .retrieve()
