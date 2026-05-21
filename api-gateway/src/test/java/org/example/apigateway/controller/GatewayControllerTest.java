@@ -1,5 +1,6 @@
 package org.example.apigateway.controller;
 
+import org.example.apigateway.security.JwtEmailExtractor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,9 @@ class GatewayControllerTest {
     @Mock
     private RestClient restClient;
 
+    @Mock
+    private JwtEmailExtractor jwtEmailExtractor;
+
     private MockMvc mockMvc;
     private RestClient.RequestBodyUriSpec uriSpec;
     private RestClient.RequestBodySpec bodySpec;
@@ -42,9 +46,10 @@ class GatewayControllerTest {
 
     @BeforeEach
     void setUp() {
-        GatewayController controller = new GatewayController(restClient);
+        GatewayController controller = new GatewayController(restClient, jwtEmailExtractor);
         ReflectionTestUtils.setField(controller, "parserUrl", "http://mock-parser");
         ReflectionTestUtils.setField(controller, "productUrl", "http://mock-product");
+        ReflectionTestUtils.setField(controller, "internalApiKey", "");
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
 

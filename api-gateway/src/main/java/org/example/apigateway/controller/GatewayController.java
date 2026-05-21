@@ -1,6 +1,7 @@
 package org.example.apigateway.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.example.apigateway.security.JwtEmailExtractor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -29,13 +30,17 @@ public class GatewayController {
     @Value("${gateway.user-url}")
     private String userUrl;
 
-    private final RestClient restClient;
+    @Value("${internal.api.key:}")
+    private String internalApiKey;
 
-    public GatewayController(RestClient restClient) {
+    private final RestClient restClient;
+    private final JwtEmailExtractor jwtEmailExtractor;
+
+    public GatewayController(RestClient restClient, JwtEmailExtractor jwtEmailExtractor) {
         this.restClient = restClient;
+        this.jwtEmailExtractor = jwtEmailExtractor;
     }
 
-    // User-service — реєстрація, логін, профіль
     @RequestMapping("/api/auth/**")
     public ResponseEntity<byte[]> proxyAuth(
             HttpMethod method,
@@ -44,8 +49,6 @@ public class GatewayController {
         return proxy(userUrl, request, method, body);
     }
 
-    // Marketplace search — parser-service
-    // GET /api/products/search?query=... перенаправляється до /api/search?query=...
     @RequestMapping("/api/products/search")
     public ResponseEntity<byte[]> proxyMarketplaceSearch(
             HttpServletRequest request,
@@ -55,7 +58,6 @@ public class GatewayController {
         return proxyToUri(targetUri, HttpMethod.GET, request, body);
     }
 
-    // Parser-service direct access
     @RequestMapping("/api/search/**")
     public ResponseEntity<byte[]> proxySearch(
             HttpMethod method,
@@ -64,7 +66,6 @@ public class GatewayController {
         return proxy(parserUrl, request, method, body);
     }
 
-    // Product-service — tracked groups
     @RequestMapping("/api/groups/**")
     public ResponseEntity<byte[]> proxyGroups(
             HttpMethod method,
@@ -73,7 +74,6 @@ public class GatewayController {
         return proxy(productUrl, request, method, body);
     }
 
-    // Product-service — tracked products CRUD
     @RequestMapping("/api/products/**")
     public ResponseEntity<byte[]> proxyProducts(
             HttpMethod method,
@@ -91,13 +91,24 @@ public class GatewayController {
 
     private ResponseEntity<byte[]> proxyToUri(String targetUri, HttpMethod method,
                                                HttpServletRequest request, byte[] body) {
+        String email = jwtEmailExtractor.extractEmail(request.getHeader("Authorization"));
         try {
             RestClient.RequestBodySpec spec = restClient.method(method)
                     .uri(URI.create(targetUri))
                     .headers(h -> {
-                        Collections.list(request.getHeaderNames()).forEach(name ->
+                        Collections.list(request.getHeaderNames()).forEach(name -> {
+                            // strip client-provided X-User-Email to prevent spoofing
+                            if (!name.equalsIgnoreCase("X-User-Email")) {
                                 Collections.list(request.getHeaders(name)).forEach(value ->
-                                        h.add(name, value)));
+                                        h.add(name, value));
+                            }
+                        });
+                        if (!internalApiKey.isBlank()) {
+                            h.set("X-Internal-Key", internalApiKey);
+                        }
+                        if (email != null) {
+                            h.set("X-User-Email", email);
+                        }
                     });
 
             if (body != null && body.length > 0) {
