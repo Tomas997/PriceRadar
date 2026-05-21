@@ -42,7 +42,11 @@ public class AuthWebController {
             session.setAttribute("telegramChatId", resp.telegramChatId());
             return "redirect:/search";
         } catch (RestClientResponseException e) {
-            ra.addFlashAttribute("error", "Invalid email or password");
+            if (e.getStatusCode().value() == 429) {
+                ra.addFlashAttribute("error", "Too many failed attempts. Please try again in a minute.");
+            } else {
+                ra.addFlashAttribute("error", "Invalid email or password");
+            }
             return "redirect:/login";
         } catch (ResourceAccessException e) {
             log.error("Gateway unreachable: {}", e.getMessage());
