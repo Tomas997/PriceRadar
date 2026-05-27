@@ -1,0 +1,9 @@
+.git/
+.gradle/
+.idea/
+.claude/
+graphify-out/
+**/build/
+data/
+*.zip
+PROJECT_DESCRIPTION.md

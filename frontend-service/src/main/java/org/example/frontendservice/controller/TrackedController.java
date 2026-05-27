@@ -119,7 +119,12 @@ public class TrackedController {
             ra.addFlashAttribute("success", "Тестове сповіщення надіслано у Telegram");
         } catch (RestClientResponseException e) {
             log.warn("Test notify failed: {}", e.getMessage());
-            ra.addFlashAttribute("error", "Не вдалося надіслати сповіщення. Перевірте Chat ID у профілі");
+            if (e.getStatusCode().value() == 502) {
+                ra.addFlashAttribute("error",
+                        "Бот заблокований у Telegram. Розблокуйте бота і надішліть тест повторно — сповіщення увімкнуться знову.");
+            } else {
+                ra.addFlashAttribute("error", "Не вдалося надіслати сповіщення. Перевірте Chat ID у профілі");
+            }
         }
         return "redirect:/tracked";
     }

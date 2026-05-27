@@ -30,6 +30,11 @@ subprojects {
 
     // Автоматично підвантажує змінні з кореневого .env при bootRun
     plugins.withId('org.springframework.boot') {
+        // Вимикаємо plain jar — залишаємо тільки fat bootJar
+        jar {
+            enabled = false
+        }
+
         tasks.named('bootRun') {
             def envFile = rootProject.file('.env')
             if (envFile.exists()) {

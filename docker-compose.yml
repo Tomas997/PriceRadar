@@ -1,62 +1,51 @@
 services:
 
-  # ── Infrastructure ──────────────────────────────────────────────────────
-  postgres:
-    image: postgres:16
-    container_name: priceradar-db
-    environment:
-      POSTGRES_DB: priceradar
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ── Microservices ───────────────────────────────────────────────────────
   parser-service:
-    build: ./parser-service
+    build:
+      context: .
+      dockerfile: parser-service/Dockerfile
     container_name: priceradar-parser
     ports:
       - "8082:8082"
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-secret}
     restart: on-failure
 
   product-service:
-    build: ./product-service
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
     container_name: priceradar-product
     ports:
       - "8081:8081"
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/priceradar
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-secret}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      PARSER_SERVICE_URL: http://parser-service:8082
+    volumes:
+      - product_data:/app/data
     depends_on:
-      postgres:
-        condition: service_healthy
+      - parser-service
     restart: on-failure
 
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
     container_name: priceradar-user
     ports:
       - "8083:8083"
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/priceradar
-      DB_USER: postgres
-      DB_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-priceradar-secret-key-must-be-at-least-32-characters-long}
-    depends_on:
-      postgres:
-        condition: service_healthy
+    volumes:
+      - user_data:/app/data
     restart: on-failure
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: priceradar-gateway
     ports:
       - "8080:8080"
@@ -64,6 +53,9 @@ services:
       PARSER_SERVICE_URL: http://parser-service:8082
       PRODUCT_SERVICE_URL: http://product-service:8081
       USER_SERVICE_URL: http://user-service:8083
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:-http://localhost:8084}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-secret}
+      JWT_SECRET: ${JWT_SECRET:-priceradar-secret-key-must-be-at-least-32-characters-long}
     depends_on:
       - parser-service
       - product-service
@@ -71,7 +63,9 @@ services:
     restart: on-failure
 
   frontend-service:
-    build: ./frontend-service
+    build:
+      context: .
+      dockerfile: frontend-service/Dockerfile
     container_name: priceradar-frontend
     ports:
       - "8084:8084"
@@ -82,4 +76,5 @@ services:
     restart: on-failure
 
 volumes:
-  postgres_data:
+  product_data:
+  user_data:
